@@ -72,11 +72,19 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Emit a human-readable summary instead of JSON",
     )
+    sub.add_argument(
+        "--skip-implementation",
+        action="store_true",
+        help=(
+            "Pascal only: strip everything after the 'implementation' keyword "
+            "before parsing (fast-symbol-graph mode; default off)."
+        ),
+    )
     sub.set_defaults(func=run)
 
 
 def run(args: argparse.Namespace) -> int:
-    parser = ASTParser()
+    parser = ASTParser(skip_implementation=args.skip_implementation)
     files_out: list[dict] = []
     failures = 0
 

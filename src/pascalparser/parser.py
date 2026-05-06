@@ -356,14 +356,29 @@ class ASTParser:
     That's it.  No Python class, no new module.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, skip_implementation: bool = False) -> None:
+        """Construct a parser.
+
+        Args:
+            skip_implementation: When ``True``, Pascal ``.pas``/``.pp`` files
+                have everything after the ``implementation`` keyword stripped
+                before being handed to tree-sitter. Repowise's
+                fast-symbol-graph optimisation: useful for indexing tens of
+                thousands of files when only forward declarations matter.
+                **Wrong default for lint/metrics work** because the
+                implementation bodies are exactly what those tools need to
+                walk. Defaults to ``False``.
+        """
+        self.skip_implementation = skip_implementation
         # Cache: lang → compiled Query object (None if .scm not found)
         self._query_cache: dict[str, object] = {}
 
     def parse_file(self, file_info: FileInfo, source: bytes) -> ParsedFile:
         """Parse *source* bytes and return a fully populated ParsedFile."""
         lang = file_info.language
-        source = _prepare_source_for_parse(file_info, source)
+        source = _prepare_source_for_parse(
+            file_info, source, skip_implementation=self.skip_implementation
+        )
 
         # Delegate to special handlers for non-tree-sitter formats.
         # Must happen before the config/language guard so that languages with
@@ -708,8 +723,24 @@ def _run_query(query: object, root_node: Node) -> list[dict[str, list[Node]]]:
     return results
 
 
-def _prepare_source_for_parse(file_info: FileInfo, source: bytes) -> bytes:
-    """Apply language-specific source trimming before handing bytes to tree-sitter."""
+def _prepare_source_for_parse(
+    file_info: FileInfo,
+    source: bytes,
+    *,
+    skip_implementation: bool = False,
+) -> bytes:
+    """Apply language-specific source trimming before handing bytes to tree-sitter.
+
+    For Pascal ``.pas``/``.pp`` files, when ``skip_implementation`` is true,
+    everything after the ``implementation`` keyword is replaced with a single
+    ``end.`` so tree-sitter only sees the interface section. This is the
+    repowise fast-symbol-graph optimisation — meaningless for lint/metrics
+    work where the implementation bodies are exactly what we need.
+
+    Defaults to *not* skipping (``skip_implementation=False``).
+    """
+    if not skip_implementation:
+        return source
     if file_info.language != "pascal":
         return source
 
