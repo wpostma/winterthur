@@ -675,25 +675,28 @@ class TestPascalParser:
         find_spec("tree_sitter_pascal") is None,
         reason="tree-sitter-pascal is not installed in the test environment",
     )
-    def test_parses_uses_imports(self, parser: ASTParser) -> None:
+    def test_parses_all_uses_imports_by_default(self, parser: ASTParser) -> None:
+        """Default parser walks both interface and implementation uses."""
         fi = _make_file_info("pascal_pkg/calculator.pas", "pascal")
         result = parser.parse_file(fi, PASCAL_SOURCE)
         module_paths = [i.module_path for i in result.imports]
-        expected_units = {"SysUtils", "Math"}
-        assert set(module_paths) == expected_units
-        assert len(result.imports) == len(expected_units)
+        expected = {"SysUtils", "Math", *PASCAL_IMPLEMENTATION_UNITS}
+        assert set(module_paths) == expected
+        assert len(result.imports) == len(expected)
 
     @pytest.mark.skipif(
         find_spec("tree_sitter_pascal") is None,
         reason="tree-sitter-pascal is not installed in the test environment",
     )
-    def test_unit_parse_stops_before_implementation_imports(self, parser: ASTParser) -> None:
+    def test_skip_implementation_drops_implementation_uses(self) -> None:
+        """With skip_implementation=True the implementation uses clause is invisible."""
+        skipping_parser = ASTParser(skip_implementation=True)
         fi = _make_file_info("pascal_pkg/calculator.pas", "pascal")
-        result = parser.parse_file(fi, PASCAL_SOURCE)
+        result = skipping_parser.parse_file(fi, PASCAL_SOURCE)
         module_paths = {i.module_path for i in result.imports}
-
-        assert "FactorFinder" not in module_paths
-        assert "CustomerSearcher" not in module_paths
+        assert module_paths == {"SysUtils", "Math"}
+        for unit in PASCAL_IMPLEMENTATION_UNITS:
+            assert unit not in module_paths
 
     @pytest.mark.skipif(
         find_spec("tree_sitter_pascal") is None,
