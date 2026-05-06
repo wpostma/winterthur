@@ -11,7 +11,7 @@ readme = "README.md"
 
 dependencies = [
     "tree-sitter>=0.23,<1",
-    "tree-sitter-pascal>=0.9,<1",
+    "tree-sitter-pascal",  # see [tool.uv.sources] — built from local fork submodule
     "tree-sitter-python>=0.23,<1",
     "tree-sitter-typescript>=0.23,<1",
     "tree-sitter-javascript>=0.23,<1",
@@ -45,6 +45,13 @@ packages = ["src/pascalparser"]
 
 [tool.uv]
 package = true
+
+[tool.uv.sources]
+# tree-sitter-pascal is built from the local fork submodule (wpostma/tree-sitter-pascal),
+# NOT pulled from PyPI. The fork carries identifier-$ continuation, bare raise,
+# property re-publication, kSafecall/kSealed regex fixes, and modernised bindings
+# that the upstream package on PyPI does not have.
+tree-sitter-pascal = { path = "thirdparty/tree-sitter-pascal", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
