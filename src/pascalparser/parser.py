@@ -1058,7 +1058,24 @@ def _clean_jsdoc(text: str) -> str:
 
 
 def _build_qualified_name(file_path: str, parent_name: str | None, name: str) -> str:
-    module = Path(file_path).with_suffix("").as_posix().replace("/", ".")
+    # Strip Windows extended-length / UNC-extended prefixes before pathlib sees
+    # them — pathlib leaves '?' literals in the as_posix() output, which would
+    # then survive into the dotted name. Order matters: UNC variant first.
+    raw = file_path
+    if raw.startswith("\\\\?\\UNC\\") or raw.startswith("//?/UNC/"):
+        raw = "\\\\" + raw[8:]            # \\?\UNC\server\share -> \\server\share
+    elif raw.startswith("\\\\?\\") or raw.startswith("//?/"):
+        raw = raw[4:]                     # \\?\C:\foo            -> C:\foo
+
+    module = (
+        Path(raw)
+        .with_suffix("")
+        .as_posix()
+        .replace(":", "")   # drop drive-letter colon: "C:/foo" -> "C/foo"
+        .replace("?", "_")  # belt-and-braces: any '?' from odd inputs
+        .replace("/", ".")
+        .lstrip(".")        # absolute & UNC paths leave a leading slash -> dot
+    )
     if parent_name:
         return f"{module}.{parent_name}.{name}"
     return f"{module}.{name}"
