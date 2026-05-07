@@ -1,4 +1,4 @@
-"""``pascalparser declaration`` — dump the full declaration of one or more symbols.
+"""``winterthur declaration`` — dump the full declaration of one or more symbols.
 
 Given a file and a display-name regex, find every matching symbol and
 print its full declaration text — signature, parameter list,

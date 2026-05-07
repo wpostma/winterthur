@@ -1,4 +1,4 @@
-"""``pascalparser metrics`` — per-function structural metrics.
+"""``winterthur metrics`` — per-function structural metrics.
 
 Output schema conforms to the contract in
 ``~/.claude/skills/codereview/metrics-tool-spec.md``. This is the

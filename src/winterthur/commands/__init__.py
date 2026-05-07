@@ -5,7 +5,7 @@ Each module exposes:
 - ``register(subparsers)`` — adds the subcommand's argparse subparser.
 - ``run(args) -> int`` — does the work, returns an exit code.
 
-The dispatcher in :mod:`pascalparser.cli` enumerates this package's
+The dispatcher in :mod:`winterthur.cli` enumerates this package's
 modules to assemble the top-level parser.
 """
 

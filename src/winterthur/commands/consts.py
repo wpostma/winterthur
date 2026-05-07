@@ -1,4 +1,4 @@
-"""``pascalparser consts`` — dump constant declarations from a file.
+"""``winterthur consts`` — dump constant declarations from a file.
 
 Const-only Pascal units (``unit foo.consts.bar; const … end.``) yield no
 records from ``symbols`` or ``metrics`` — those tools target callable

@@ -1,4 +1,4 @@
-"""``pascalparser smells`` — pattern-based smell detection.
+"""``winterthur smells`` — pattern-based smell detection.
 
 Stub: not yet implemented. Will host the pattern detectors documented
 in ``~/.claude/skills/codereview/smells.md`` (silent exits, R2/R3/R4
@@ -27,7 +27,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 def run(args: argparse.Namespace) -> int:
     print(
-        "pascalparser smells: not yet implemented.\n"
+        "winterthur smells: not yet implemented.\n"
         "  See ~/.claude/skills/codereview/smells.md for the planned rule set.\n"
         "  Track progress in the project README.",
         file=sys.stderr,

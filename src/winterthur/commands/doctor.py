@@ -1,6 +1,6 @@
-"""``pascalparser doctor`` — verify the install is functional.
+"""``winterthur doctor`` — verify the install is functional.
 
-Loads each tree-sitter language registered in :mod:`pascalparser.parser`,
+Loads each tree-sitter language registered in :mod:`winterthur.parser`,
 parses a one-line snippet per language as a smoke test, and reports
 versions. Exit code 0 if everything works; 1 if any language fails.
 """
@@ -38,12 +38,12 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 def run(args: argparse.Namespace) -> int:
     from tree_sitter import Parser
 
-    print("pascalparser doctor")
+    print("winterthur doctor")
     try:
-        version = importlib.metadata.version("pascalparser")
+        version = importlib.metadata.version("winterthur")
     except importlib.metadata.PackageNotFoundError:
         version = "(dev, not installed)"
-    print(f"  pascalparser version: {version}")
+    print(f"  winterthur version: {version}")
 
     failures = 0
     for tag in sorted(LANGUAGE_CONFIGS):

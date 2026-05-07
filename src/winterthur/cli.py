@@ -1,10 +1,10 @@
 """Top-level CLI entry point.
 
-Designed to be invoked via ``uvx pascalparser …`` or
-``pipx install pascalparser`` followed by ``pascalparser …`` on PATH.
+Designed to be invoked via ``uvx winterthur …`` or
+``pipx install winterthur`` followed by ``winterthur …`` on PATH.
 The CLI is the contract; the importable Python API is a side benefit.
 
-Subcommands live in :mod:`pascalparser.commands`. Each registers its
+Subcommands live in :mod:`winterthur.commands`. Each registers its
 own argparse subparser and a ``run(args) -> int`` handler. To add a
 new subcommand:
 
@@ -27,7 +27,7 @@ from .commands import ALL_COMMANDS
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pascalparser",
+        prog="winterthur",
         description=(
             "Pascal/Delphi parser plus lint and metrics tooling. "
             "Single-unit-of-compilation scanning via tree-sitter — "
@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"pascalparser {__version__}",
+        version=f"winterthur {__version__}",
     )
 
     subparsers = parser.add_subparsers(

@@ -1,4 +1,4 @@
-"""``python -m pascalparser`` shim.
+"""``python -m winterthur`` shim.
 
 Lets the package run as a module without going through the installed
 entry-point script. Useful in dev when ``uv sync`` / ``pip install``

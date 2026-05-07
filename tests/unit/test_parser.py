@@ -11,8 +11,8 @@ from importlib.util import find_spec
 
 import pytest
 
-from pascalparser.models import FileInfo
-from pascalparser.parser import LANGUAGE_CONFIGS, ASTParser
+from winterthur.models import FileInfo
+from winterthur.parser import LANGUAGE_CONFIGS, ASTParser
 
 # ---------------------------------------------------------------------------
 # Helpers

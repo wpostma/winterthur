@@ -1,22 +1,36 @@
-# pascalparser — Claude Code project notes
+# winterthur — Claude Code project notes
+
+<img src="docs/images/Niklaus_Wirth_large.jpg" alt="Niklaus Wirth" width="220" align="right" />
 
 Project-local conventions on top of the global `~/.claude/CLAUDE.md`.
 Read both before making changes.
 
 ## What this project is
 
-A Pascal/Delphi parser plus lint and metrics tooling, built on
-tree-sitter. The underlying parser is multi-language (carried over from
-repowise). The project may be renamed `codeparser` when the
-multi-language scope is more authoritative than the Pascal focus.
+A multi-language source parser plus lint and metrics tooling, built on
+tree-sitter. First-class support for Pascal/Delphi (the original
+motivation) plus Python, Rust, TypeScript, JavaScript, Java, Go, and
+C/C++. C# coverage is a planned extension.
+
+**The name.** The tool is named for **Winterthur**, the Swiss city
+where Niklaus Wirth — creator of the Pascal language — was born in
+1934. Wirth's broader influence (Modula, Oberon, Lilith, an emphasis
+on simplicity) is the spirit this tool tries to honour: small,
+sharp-edged, language-aware tooling that does one thing and reads
+like its input.
+
+The repo dir, the Python package (`src/winterthur/`), and the CLI
+command are all `winterthur`. Earlier git history will show the
+package's previous name `pascalparser` — that's the same project,
+pre-rename.
 
 ## Where things live
 
-- **Parser source:** `src/pascalparser/parser.py` (multi-language;
+- **Parser source:** `src/winterthur/parser.py` (multi-language;
   do NOT strip out other languages).
-- **Models:** `src/pascalparser/models.py` (FileInfo, ParsedFile,
+- **Models:** `src/winterthur/models.py` (FileInfo, ParsedFile,
   Symbol, Import). Plain dataclasses for speed.
-- **Tree-sitter queries:** `src/pascalparser/queries/<lang>.scm`.
+- **Tree-sitter queries:** `src/winterthur/queries/<lang>.scm`.
   Capture-name conventions: `@symbol.def`, `@symbol.name`,
   `@symbol.params`, `@symbol.modifiers`, `@symbol.receiver`,
   `@import.statement`, `@import.module`. Same conventions as repowise.
@@ -35,7 +49,7 @@ multi-language scope is more authoritative than the Pascal focus.
 | Extension → language mapping | `models.py` | `.pas .dpr .dpk .pp` → `pascal`; `.dfm` → `pascal-form` |
 | LanguageConfig for pascal | `parser.py` | exists in LANGUAGE_CONFIGS dict |
 | tree-sitter loader | `parser.py` | `_try_load("pascal", lambda: Language(__import__("tree_sitter_pascal").language()))` |
-| pascal.scm query | `src/pascalparser/queries/pascal.scm` | symbols + imports captures |
+| pascal.scm query | `src/winterthur/queries/pascal.scm` | symbols + imports captures |
 
 ## Single unit of compilation rule
 
@@ -45,7 +59,7 @@ files be available. Treat each input file as a self-contained AST. The
 parser's `Import` records track what the file *says* it depends on; we
 do not follow those imports across files.
 
-This is the architectural choice that distinguishes pascalparser from
+This is the architectural choice that distinguishes winterthur from
 Embarcadero's `AuditsCLI` (which requires a working `.dproj` build) and
 from DelphiAST-based tooling (which often needs `uses` resolution to
 produce useful output).
@@ -86,15 +100,15 @@ uv sync --extra dev                                    # NOTE: --extra dev — s
 
 # Daily
 .\test.ps1                                             # ← canonical test entry point
-uv run pascalparser doctor                             # smoke-check all 9 grammars load
-uv run pascalparser symbols path\to\Unit.pas
-uv run pascalparser parse   path\to\Unit.pas --depth 3 # folded source view (see below)
-uv run pascalparser metrics path\to\Unit.pas --json    # codereview-skill contract
+uv run winterthur doctor                             # smoke-check all 9 grammars load
+uv run winterthur symbols path\to\Unit.pas
+uv run winterthur parse   path\to\Unit.pas --depth 3 # folded source view (see below)
+uv run winterthur metrics path\to\Unit.pas --json    # codereview-skill contract
 ```
 
 ### Subcommand: `parse` (folded source view)
 
-`pascalparser parse FILE --depth N` renders the source code with the
+`winterthur parse FILE --depth N` renders the source code with the
 bodies of nodes deeper than N folded into language-comment elisions
 like `// ... (lines 29-50 elided)`. Use it to get an LLM-friendly
 outline of a file without loading the whole thing.
@@ -149,15 +163,15 @@ Other parse modes:
 
 ```powershell
 # Errors flagged inline with a language-comment annotation
-uv run pascalparser parse path\to\malformed.pas --depth 1
+uv run winterthur parse path\to\malformed.pas --depth 1
 # Output ends up with lines like:
 #   unit Foo;  // ! ERROR ! tree-sitter could not parse this region
 
 # Raw AST dump (was the old default; now opt-in for grammar-coverage debugging)
-uv run pascalparser parse path\to\Unit.pas --depth 4 --debug
+uv run winterthur parse path\to\Unit.pas --depth 4 --debug
 
 # Just the parse-error nodes (implies --debug)
-uv run pascalparser parse path\to\Unit.pas --errors-only
+uv run winterthur parse path\to\Unit.pas --errors-only
 ```
 
 ### Subcommand: `symbols` (terse symbol & import dump)
@@ -168,10 +182,10 @@ classes/methods/functions with line numbers in roughly one line per
 symbol, no body content, no metrics noise.
 
 ```powershell
-uv run pascalparser symbols path\to\Unit.pas
-uv run pascalparser symbols path\to\Unit.pas --json              # machine-readable
-uv run pascalparser symbols path\to\Unit.pas --regex "^TOrder\." # filter to TOrder methods
-uv run pascalparser symbols path\to\Unit.pas --regex "refund"    # case-insensitive substring
+uv run winterthur symbols path\to\Unit.pas
+uv run winterthur symbols path\to\Unit.pas --json              # machine-readable
+uv run winterthur symbols path\to\Unit.pas --regex "^TOrder\." # filter to TOrder methods
+uv run winterthur symbols path\to\Unit.pas --regex "refund"    # case-insensitive substring
 ```
 
 `--regex PATTERN` filters by Python regex match (`re.search` semantics)
@@ -198,7 +212,7 @@ Multi-keyword alternation is the killer combination — find every
 symbol or import related to any of N concepts in one query:
 
 ```powershell
-uv run pascalparser symbols path\to\OrderDM.pas --regex "(types|age|collection)"
+uv run winterthur symbols path\to\OrderDM.pas --regex "(types|age|collection)"
 ```
 
 Sample output on a real ~7000-line Delphi unit:
@@ -280,16 +294,16 @@ command exists.
 
 ```powershell
 # One method, full signature
-uv run pascalparser declaration path\to\OrderDM.pas TOrder.AddNormalItem
+uv run winterthur declaration path\to\OrderDM.pas TOrder.AddNormalItem
 
 # All overloads of a name (glob)
-uv run pascalparser declaration path\to\OrderDM.pas "TOrder.AddNormalItem*"
+uv run winterthur declaration path\to\OrderDM.pas "TOrder.AddNormalItem*"
 
 # Family search: every TOrder.Calculate* method
-uv run pascalparser declaration path\to\OrderDM.pas "TOrder.Calculate*"
+uv run winterthur declaration path\to\OrderDM.pas "TOrder.Calculate*"
 
 # Use a real regex if glob isn't expressive enough
-uv run pascalparser declaration path\to\OrderDM.pas "TOrder\.(Add|Insert)Item.*" --regex
+uv run winterthur declaration path\to\OrderDM.pas "TOrder\.(Add|Insert)Item.*" --regex
 ```
 
 Sample for `TOrder.AddNormalItem*` (3 overloads shown):
@@ -325,7 +339,7 @@ broad globs like `"*.Add*"` that match dozens.
 prefix?" against a real ~7000-line Delphi unit:
 
 ```powershell
-uv run pascalparser declaration path\to\OrderDM.pas "TOrder.R*" --limit 30
+uv run winterthur declaration path\to\OrderDM.pas "TOrder.R*" --limit 30
 ```
 
 Yields the full signatures of every `TOrder` method whose name starts
@@ -369,7 +383,7 @@ typically have dozens of `OnClick` handlers named `<Button>ButtonClick`.
 A trailing-anchor glob fetches them all in one call:
 
 ```powershell
-uv run pascalparser declaration path\to\MainMenu.pas "*ButtonClick"
+uv run winterthur declaration path\to\MainMenu.pas "*ButtonClick"
 ```
 
 Excerpt from a real form unit:
@@ -395,7 +409,7 @@ you slice across the class dimension and the method dimension at the
 same time — find every getter on every T-class:
 
 ```powershell
-uv run pascalparser declaration path\to\RAPCustom.pas "T*.Get*" --limit 40
+uv run winterthur declaration path\to\RAPCustom.pas "T*.Get*" --limit 40
 ```
 
 Excerpt:
@@ -442,13 +456,13 @@ file with its line, name, and full text.
 
 ```powershell
 # Dump every const in a file
-uv run pascalparser consts path\to\foo.consts.commerce.pas
+uv run winterthur consts path\to\foo.consts.commerce.pas
 
 # Filter by glob
-uv run pascalparser consts path\to\foo.consts.commerce.pas "bt_*"
+uv run winterthur consts path\to\foo.consts.commerce.pas "bt_*"
 
 # Regex if glob isn't enough
-uv run pascalparser consts path\to\OrderDM.pas "WaiverMode.*" --regex
+uv run winterthur consts path\to\OrderDM.pas "WaiverMode.*" --regex
 ```
 
 Sample on a real const-only unit:
@@ -475,23 +489,23 @@ case-insensitive unless `--case-sensitive`.
 
 ```powershell
 # JSON for codereview-skill consumption — contract in metrics-tool-spec.md
-uv run pascalparser metrics path\to\Unit.pas
+uv run winterthur metrics path\to\Unit.pas
 
 # Human-readable summary instead
-uv run pascalparser metrics path\to\Unit.pas --text
+uv run winterthur metrics path\to\Unit.pas --text
 
 # --dir is a path PREFIX (not a "scan dir" flag). Positional args are the
 # real selection — literal names or globs, resolved relative to --dir.
-uv run pascalparser metrics --dir C:\path\to\Source AdjustDrawer.pas
+uv run winterthur metrics --dir C:\path\to\Source AdjustDrawer.pas
 
 # Glob matched relative to --dir (shallow)
-uv run pascalparser metrics --dir C:\path\to\Source "Order*.pas"
+uv run winterthur metrics --dir C:\path\to\Source "Order*.pas"
 
 # Recursive multi-extension scan, single call
-uv run pascalparser metrics --dir C:\path\to\repo --recurse "*.py" "*.ts" "*.pas"
+uv run winterthur metrics --dir C:\path\to\repo --recurse "*.py" "*.ts" "*.pas"
 
 # Default cap is 30 files; raise with --limit
-uv run pascalparser metrics --dir C:\path\to\Source --recurse "*.pas" --limit 200
+uv run winterthur metrics --dir C:\path\to\Source --recurse "*.pas" --limit 200
 ```
 
 Counter fields (`if_count`, `try_count`, `raise_count`, …) are **omitted
@@ -515,7 +529,7 @@ footgun below for why this matters.
 **Do not** `.venv\Scripts\activate` — `uv run` invokes the right
 interpreter from `.venv\` directly. Activating works, but it's extra
 ceremony with no payoff and it confuses future-Claude into running
-bare `pytest` / `pascalparser` and getting the wrong env.
+bare `pytest` / `winterthur` and getting the wrong env.
 
 ### Footgun: `uv sync` without `--extra dev` silently breaks pytest
 
@@ -527,7 +541,7 @@ through to whatever Python on PATH has it — typically a system Python
 that has no idea about this project's `src/` layout. You get:
 
 ```
-ModuleNotFoundError: No module named 'pascalparser'
+ModuleNotFoundError: No module named 'winterthur'
 ```
 
 …on a Python version that isn't even 3.11. This is what `test.ps1`
@@ -546,8 +560,8 @@ If you ever see that ModuleNotFoundError, run `.\test.ps1` (or
 | Re-pin lockfile after editing `pyproject.toml` | `uv lock` then commit `uv.lock` |
 | Add a runtime dep | `uv add <pkg>` (edits pyproject + lock) |
 | Add a dev dep | `uv add --dev <pkg>` |
-| Wire `pascalparser.exe` into the codereview skill | point its `metrics_tool` at `C:\vsdev\pascalparser\.venv\Scripts\pascalparser.exe` (the shim `uv sync` already wrote) |
-| Install globally on PATH outside this repo | `uvx --from . pascalparser …` or `pipx install .` — **only** for downstream use, never for dev work in this tree |
+| Wire `winterthur.exe` into the codereview skill | point its `metrics_tool` at `C:\vsdev\winterthur\.venv\Scripts\winterthur.exe` (the shim `uv sync` already wrote) |
+| Install globally on PATH outside this repo | `uvx --from . winterthur …` or `pipx install .` — **only** for downstream use, never for dev work in this tree |
 
 ### Plain-`pip` fallback (only if `uv` isn't available)
 
@@ -583,7 +597,7 @@ skill's metrics tool:
 ```json
 // ~/.claude/skills/codereview/config.json
 {
-  "metrics_tool": "/c/vsdev/pascalparser/.venv/Scripts/pascalparser.exe"
+  "metrics_tool": "/c/vsdev/winterthur/.venv/Scripts/winterthur.exe"
 }
 ```
 
@@ -596,14 +610,3 @@ skill's metrics tool:
 - Submodule is **pinned to a specific SHA** in the parent repo. Bumping
   the SHA is a deliberate commit, not an automatic action.
 
-## Renaming to codeparser later
-
-If/when we rename:
-- Repo dir: `C:\vsdev\pascalparser` → `C:\vsdev\codeparser`
-- Python package: `src/pascalparser/` → `src/codeparser/`
-- Project name in `pyproject.toml`
-- All `from pascalparser.X import Y` in tests
-- This file (CLAUDE.md), the README, the codereview skill's
-  `config.json`
-
-Until that happens, "pascalparser" is the project identity.

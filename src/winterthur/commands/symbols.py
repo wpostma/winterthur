@@ -1,6 +1,6 @@
-"""``pascalparser symbols`` — dump symbols and imports.
+"""``winterthur symbols`` — dump symbols and imports.
 
-For a list of source files, run :class:`pascalparser.parser.ASTParser`
+For a list of source files, run :class:`winterthur.parser.ASTParser`
 and emit each file's symbols + imports either as text (default) or as
 JSON. Useful as a sanity check that the parser+queries combination is
 extracting what you expect.

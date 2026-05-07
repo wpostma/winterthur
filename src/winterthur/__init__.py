@@ -1,4 +1,4 @@
-"""pascalparser — Pascal/Delphi parser plus lint and metrics tooling.
+"""winterthur — Pascal/Delphi parser plus lint and metrics tooling.
 
 The underlying ``ASTParser`` is multi-language (carried over from
 repowise); this project is named for its primary use case.

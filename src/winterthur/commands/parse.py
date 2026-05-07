@@ -1,4 +1,4 @@
-"""``pascalparser parse`` — depth-limited file view.
+"""``winterthur parse`` — depth-limited file view.
 
 Default output: the source code itself, with bodies of nodes deeper than
 ``--depth`` folded into language-comment elisions like

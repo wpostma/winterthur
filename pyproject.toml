@@ -1,7 +1,7 @@
 [project]
-name = "pascalparser"
+name = "winterthur"
 version = "0.1.0"
-description = "Pascal/Delphi parser, lint and metrics tooling. Single-unit-of-compilation scanning via tree-sitter (no .dproj, no compile)."
+description = "Multi-language source parser + lint/metrics tooling, with first-class Pascal/Delphi support. Single-unit-of-compilation scanning via tree-sitter (no .dproj, no compile). Named for Winterthur, Switzerland — birthplace of Niklaus Wirth."
 requires-python = ">=3.11"
 authors = [
     { name = "Warren Postma" },
@@ -31,17 +31,17 @@ dev = [
 ]
 
 [project.scripts]
-pascalparser = "pascalparser.cli:main"
+winterthur = "winterthur.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pascalparser"]
+packages = ["src/winterthur"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/pascalparser/queries" = "pascalparser/queries"
+"src/winterthur/queries" = "winterthur/queries"
 
 [tool.uv]
 package = true

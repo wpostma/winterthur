@@ -3,7 +3,7 @@
 Given a tree-sitter parse tree, descends into each function-shaped subtree
 and counts decision points, exits, loops, etc. Output keyed by function
 line-range so the metrics command can zip results onto :class:`Symbol`
-records emitted by :mod:`pascalparser.parser`.
+records emitted by :mod:`winterthur.parser`.
 
 The walker is language-aware via :data:`NODE_KINDS_BY_LANGUAGE` — node-type
 names differ between grammars. New languages = one entry in that table.

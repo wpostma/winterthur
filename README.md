@@ -1,14 +1,14 @@
-# pascalparser
+# winterthur
 
-Pascal/Delphi parser plus a lint and metrics tooling system, built on
-tree-sitter.
+<img src="docs/images/Niklaus_Wirth_large.jpg" alt="Niklaus Wirth" width="180" align="right" />
 
-The parser module itself is multi-language (carried over from the
-[repowise](https://github.com/wpostma/repowise) ingestion pipeline) — the
-project is named for its primary use case but the underlying `ASTParser`
-handles Python, Go, Rust, Java, JS/TS, C/C++, and Pascal. The project
-**may be renamed `codeparser`** when the multi-language scope feels more
-authoritative than the Pascal focus.
+Multi-language source parser + lint and metrics tooling, built on
+tree-sitter. First-class support for **Pascal/Delphi** (the original
+motivation) plus Python, Rust, TypeScript, JavaScript, Java, Go, and
+C/C++. C# coverage is a planned extension.
+
+Named for **Winterthur**, the Swiss city where Niklaus Wirth — creator
+of the Pascal language — was born in 1934.
 
 ## Goals
 
@@ -29,15 +29,15 @@ authoritative than the Pascal focus.
 ## Layout
 
 ```
-pascalparser/
+winterthur/
   thirdparty/tree-sitter-pascal/    # git submodule, fork at wpostma/tree-sitter-pascal
-  src/pascalparser/
+  src/winterthur/
     parser.py                        # multi-language tree-sitter AST parser
     models.py                        # FileInfo, ParsedFile, Symbol, Import
     special_handlers.py              # Dockerfile/Makefile/OpenAPI parsers
     queries/
       pascal.scm                     # symbols + imports query (extends as needed)
-    cli.py                           # CLI entry: pascalparser <file...>
+    cli.py                           # CLI entry: winterthur <file...>
     metrics.py                       # JSON-emitting metrics for codereview
     smells.py                        # pattern detectors (silent exit, R2-R4, etc.)
   tests/
@@ -52,7 +52,7 @@ pascalparser/
 ```powershell
 # Clone with submodule
 git clone --recurse-submodules <repo>
-cd pascalparser
+cd winterthur
 
 # Install in dev mode
 uv sync                              # or: pip install -e ".[dev]"
@@ -61,7 +61,7 @@ uv sync                              # or: pip install -e ".[dev]"
 pytest
 
 # CLI
-pascalparser FrontPOS/Source/AccessTicketUtil.pas > metrics.json
+winterthur FrontPOS/Source/AccessTicketUtil.pas > metrics.json
 ```
 
 ## Provenance
