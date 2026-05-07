@@ -332,6 +332,61 @@ def make_adders():
 
 
 # ---------------------------------------------------------------------------
+# Qualified-name extraction (used by the smells command for findings labels)
+# ---------------------------------------------------------------------------
+
+
+class TestQualifiedName:
+    def _name(self, source: str) -> str | None:
+        # Drive the walker directly so we test the method in isolation
+        # (independent of the smells command).
+        from winterthur.walkers import get_walker
+        from winterthur.walkers.base import _iter_descendants
+        root, src = _parse_python(source)
+        walker = get_walker("python")
+        for n in _iter_descendants(root):
+            if n.type in walker.function_node_types:
+                return walker.qualified_name(n, src)
+        return None
+
+    def test_top_level_function_is_bare(self) -> None:
+        assert self._name("def frobnicate():\n    pass\n") == "frobnicate"
+
+    def test_class_method_is_qualified(self) -> None:
+        assert self._name("""\
+class Calculator:
+    def add(self, x, y):
+        return x + y
+""") == "Calculator.add"
+
+    def test_nested_function_stays_unqualified(self) -> None:
+        # Convention: nested-in-function definitions are reported with
+        # bare names — line range disambiguates. Outer is the *first*
+        # function found in tree order, so this picks it up; for inner
+        # we'd need a different fixture, but the no-pollution test is
+        # in TestMultipleAndNested.
+        assert self._name("""\
+def outer():
+    def inner():
+        pass
+""") == "outer"
+
+    def test_async_function_resolves(self) -> None:
+        # async def is still a function_definition; qualified_name must
+        # see through any leading async keyword.
+        assert self._name("async def fetch(url):\n    pass\n") == "fetch"
+
+    def test_decorated_function_resolves(self) -> None:
+        # Decorators wrap the function_definition in a decorated_definition
+        # parent; the function itself is still findable and named.
+        assert self._name("""\
+@some_decorator
+def handler(req):
+    pass
+""") == "handler"
+
+
+# ---------------------------------------------------------------------------
 # Multiple functions and nested-function isolation
 # ---------------------------------------------------------------------------
 

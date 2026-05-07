@@ -121,6 +121,33 @@ class PythonWalker(LanguageWalker):
             m.param_count = _bump(m.param_count)
             m.params.append(name)
 
+    def qualified_name(self, fn_node, source: bytes) -> str | None:
+        """Return ``Foo.bar`` for class methods, bare ``foo`` otherwise.
+
+        Walks the parent chain looking for an enclosing
+        ``class_definition`` to qualify the method name. Functions
+        nested inside another function deliberately stay unqualified —
+        producing ``outer.<locals>.inner`` would be more accurate but
+        louder, and the line range disambiguates anyway.
+        """
+        name_node = _function_name_node(fn_node)
+        if name_node is None:
+            return None
+        name = _decode(name_node, source)
+
+        parent = fn_node.parent
+        while parent is not None:
+            if parent.type == "class_definition":
+                class_name = _function_name_node(parent)  # also works for class
+                if class_name is not None:
+                    return f"{_decode(class_name, source)}.{name}"
+                return name
+            if parent.type == "function_definition":
+                # Nested in a function — stay unqualified.
+                return name
+            parent = parent.parent
+        return name
+
     def validate_structure(self, root_node, source: bytes) -> list[str]:
         """Surface tree-sitter parse errors only.
 
@@ -141,6 +168,22 @@ class PythonWalker(LanguageWalker):
 # ---------------------------------------------------------------------------
 # Helpers (file-private)
 # ---------------------------------------------------------------------------
+
+
+def _function_name_node(node):
+    """Return the ``identifier`` child that names a function or class.
+
+    Tries the named ``name`` field first (works on most tree-sitter-python
+    versions), then falls back to the first identifier child — useful for
+    decorated definitions where the field lookup may differ.
+    """
+    n = node.child_by_field_name("name")
+    if n is not None:
+        return n
+    for c in node.children:
+        if c.type == "identifier":
+            return c
+    return None
 
 
 _PARAM_PUNCTUATION = frozenset({

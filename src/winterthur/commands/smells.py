@@ -325,14 +325,11 @@ def _function_qualified_names(
 ) -> dict[tuple[int, int], tuple[int, str]]:
     """Map ``(start_line, end_line)`` -> ``(start_line, qualified_name)``.
 
-    Reuses the same metrics-walker iteration logic so the keys line up
-    exactly with :func:`collect_function_metrics`. The qualified name is
-    extracted by walking the function's ``declProc`` child for the
-    identifier sequence — Pascal's ``TFoo.Bar`` shows up as a ``genericDot``
-    holding two identifiers; bare ``Frobnicate`` shows up as one identifier.
+    Iteration mirrors :func:`collect_function_metrics` so the keys line
+    up exactly. Per-language name extraction is delegated to the
+    walker's :meth:`LanguageWalker.qualified_name` method; the fallback
+    for an unsupported language or unrecognised shape is ``"?"``.
     """
-    if language != "pascal":
-        return {}
     walker = get_walker(language)
     if walker is None:
         return {}
@@ -343,32 +340,9 @@ def _function_qualified_names(
             continue
         start = node.start_point[0] + 1
         end = node.end_point[0] + 1
-        qual = _qualified_name_from_decl(node, source) or "?"
+        qual = walker.qualified_name(node, source) or "?"
         out[(start, end)] = (start, qual)
     return out
-
-
-def _qualified_name_from_decl(fn_node, source: bytes) -> str | None:
-    decl = next((c for c in fn_node.children if c.type == "declProc"), None)
-    if decl is None:
-        return None
-    parts: list[str] = []
-    for c in decl.children:
-        if c.type == "identifier":
-            parts.append(_text(c, source))
-            break  # bare-name case: stop at the first identifier
-        if c.type == "genericDot":
-            for sub in c.children:
-                if sub.type == "identifier":
-                    parts.append(_text(sub, source))
-            break
-    if not parts:
-        return None
-    return ".".join(parts)
-
-
-def _text(node, source: bytes) -> str:
-    return source[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
 
 
 _PARSE_ERROR_DISCLAIMER = (

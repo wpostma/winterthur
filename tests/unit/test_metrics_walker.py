@@ -536,6 +536,38 @@ end.
 # ---------------------------------------------------------------------------
 
 
+class TestQualifiedName:
+    """qualified_name moved off commands/smells.py onto PascalWalker."""
+
+    def _name(self, source: str) -> str | None:
+        from winterthur.walkers import get_walker
+        from winterthur.walkers.base import _iter_descendants
+        root, src = _parse_pascal(source)
+        walker = get_walker("pascal")
+        for n in _iter_descendants(root):
+            if n.type in walker.function_node_types:
+                return walker.qualified_name(n, src)
+        return None
+
+    def test_top_level_function_is_bare(self) -> None:
+        assert self._name("""\
+unit T; interface implementation
+procedure Frobnicate;
+begin
+end;
+end.
+""") == "Frobnicate"
+
+    def test_method_definition_is_qualified(self) -> None:
+        assert self._name("""\
+unit T; interface implementation
+procedure TFoo.Bar;
+begin
+end;
+end.
+""") == "TFoo.Bar"
+
+
 class TestUnsupportedLanguage:
     def test_unknown_language_returns_empty_metrics_dict(self) -> None:
         # No walker registered for "rust" yet; contract is empty dict, no crash.

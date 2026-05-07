@@ -143,6 +143,42 @@ class PascalWalker(LanguageWalker):
             if text.lower() in targets:
                 m.result_assign_count = _bump(m.result_assign_count)
 
+    def qualified_name(self, fn_node, source: bytes) -> str | None:
+        """Return ``TFoo.Bar`` for methods, bare ``Frobnicate`` for top-level.
+
+        Pascal's tree-sitter shape: ``defProc`` contains a ``declProc``
+        whose children are either a single ``identifier`` (top-level
+        function) or a ``genericDot`` holding two identifiers (qualified
+        method definition).
+        """
+        decl = next(
+            (c for c in fn_node.children if c.type == "declProc"),
+            None,
+        )
+        if decl is None:
+            return None
+        parts: list[str] = []
+        for c in decl.children:
+            if c.type == "identifier":
+                parts.append(
+                    source[c.start_byte:c.end_byte].decode(
+                        "utf-8", errors="replace"
+                    )
+                )
+                break  # bare-name case: stop at the first identifier
+            if c.type == "genericDot":
+                for sub in c.children:
+                    if sub.type == "identifier":
+                        parts.append(
+                            source[sub.start_byte:sub.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                        )
+                break
+        if not parts:
+            return None
+        return ".".join(parts)
+
     def validate_structure(self, root_node, source: bytes) -> list[str]:
         """Surface tree-sitter parse errors, begin/end token imbalance,
         and a missing ``end.`` unit terminator.

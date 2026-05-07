@@ -148,6 +148,17 @@ class LanguageWalker:
         """Return human-readable structural errors for *root_node*."""
         return []
 
+    def qualified_name(self, fn_node, source: bytes) -> str | None:
+        """Return the function's qualified name, e.g. ``Class.method``.
+
+        Used by the smells command to label findings. Defaults to
+        ``None``, which the caller renders as ``"?"``. Subclasses should
+        return the unqualified name for top-level functions and a
+        dotted form for class methods (e.g. Python ``Foo.bar`` or
+        Pascal ``TFoo.Bar``).
+        """
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Generic driver
