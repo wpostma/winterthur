@@ -41,6 +41,7 @@ _FUNCTION_KINDS = frozenset(
 def register(subparsers: argparse._SubParsersAction) -> None:
     sub = subparsers.add_parser(
         "metrics",
+        aliases=["metric"],
         help="Per-function structural metrics (JSON for the codereview skill)",
     )
     sub.add_argument(

@@ -295,7 +295,7 @@ uv run pascalparser declaration path\to\OrderDM.pas "TOrder\.(Add|Insert)Item.*"
 Sample for `TOrder.AddNormalItem*` (3 overloads shown):
 
 ```
-path\to\OrderDM.pas:872  (method)
+path\to\OrderDM.pas:872  (interface)
 ----------------------------------------------------------------------
 function AddNormalItem(
                 const ModalParent: TCustomForm;
@@ -304,7 +304,7 @@ function AddNormalItem(
                 ...
                 var ItemState:TOrderItemState) : TGUID; overload;
 
-path\to\OrderDM.pas:884  (method)
+path\to\OrderDM.pas:884  (interface)
 ----------------------------------------------------------------------
 function AddNormalItem(
                 const ModalParent: TCustomForm;
@@ -333,24 +333,24 @@ with `R` — refresh, reset, refund, replace, reallocate, reassign,
 reinstate, recall, recalc, remove, etc. Excerpt:
 
 ```
-path\to\OrderDM.pas:605  (method)
+path\to\OrderDM.pas:605  (interface)
 ----------------------------------------------------------------------
 procedure RefreshItemsOnce;
 
-path\to\OrderDM.pas:683  (method)
+path\to\OrderDM.pas:683  (interface)
 ----------------------------------------------------------------------
 function ReplaceQuantitySeatCheckAndID(const Fields : string; Qty : integer;
       SeatNumber, CheckNumber : Integer; var NewID : TGuid) : string;
 
-path\to\OrderDM.pas:715  (method)
+path\to\OrderDM.pas:715  (interface)
 ----------------------------------------------------------------------
 procedure ResetPayments;
 
-path\to\OrderDM.pas:720  (method)
+path\to\OrderDM.pas:720  (interface)
 ----------------------------------------------------------------------
 procedure ResetLocalOrders(const KeepLock: boolean = false);
 
-path\to\OrderDM.pas:977  (method)
+path\to\OrderDM.pas:977  (interface)
 ----------------------------------------------------------------------
 procedure ReAllocateWorkingPackageItems(
         const OrderItemID: TGUID;
@@ -375,15 +375,15 @@ uv run pascalparser declaration path\to\MainMenu.pas "*ButtonClick"
 Excerpt from a real form unit:
 
 ```
-path\to\MainMenu.pas:863  (function)
+path\to\MainMenu.pas:863  (implementation)
 ----------------------------------------------------------------------
 procedure TIPMainMenu.DrawerManagerButtonClick(Sender: TObject);
 
-path\to\MainMenu.pas:991  (function)
+path\to\MainMenu.pas:991  (implementation)
 ----------------------------------------------------------------------
 procedure TIPMainMenu.AuthorizedCreditCardChargesButtonClick(Sender: TObject);
 
-path\to\MainMenu.pas:1001  (function)
+path\to\MainMenu.pas:1001  (implementation)
 ----------------------------------------------------------------------
 procedure TIPMainMenu.MovieReportsButtonClick(Sender: TObject);
 
@@ -401,19 +401,19 @@ uv run pascalparser declaration path\to\RAPCustom.pas "T*.Get*" --limit 40
 Excerpt:
 
 ```
-path\to\RAPCustom.pas:20  (method)
+path\to\RAPCustom.pas:20  (interface)
 -----------------------------------------------------------------------
 class function GetSignature: String; override;
 ...
-path\to\RAPCustom.pas:48  (function)
+path\to\RAPCustom.pas:48  (implementation)
 -----------------------------------------------------------------------
 class function TConverUOM.GetSignature: String;
 
-path\to\RAPCustom.pas:81  (function)
+path\to\RAPCustom.pas:81  (implementation)
 -----------------------------------------------------------------------
 class function TSetSearch.GetSignature: String;
 
-path\to\RAPCustom.pas:122  (function)
+path\to\RAPCustom.pas:122  (implementation)
 -----------------------------------------------------------------------
 { TGetDate }
 class function TGetDate.GetSignature: String;

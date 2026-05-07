@@ -36,6 +36,7 @@ from .parse import _PARSE_ERROR_DISCLAIMER, _BODY_CHILD_TYPES
 def register(subparsers: argparse._SubParsersAction) -> None:
     sub = subparsers.add_parser(
         "declaration",
+        aliases=["declarations"],
         help="Dump the full declaration (signature + params) of matching symbols",
     )
     sub.add_argument("file", help="Source file")
@@ -160,7 +161,8 @@ def run(args: argparse.Namespace) -> int:
 
         leading_comments = _leading_comments_for(comments, sym.start_line)
 
-        header = f"{file_info.path}:{sym.start_line}  ({sym.kind})"
+        section = _section_label(node, file_info.language, sym)
+        header = f"{file_info.path}:{sym.start_line}  ({section})"
         print(f"\n{header}")
         print("-" * len(header))
         for c in leading_comments:
@@ -255,6 +257,30 @@ def _leading_comments_for(
         block.insert(0, text)
         next_expected_end = cs - 1
     return block
+
+
+def _section_label(node, language: str, sym) -> str:
+    """Pick a section tag for the per-match header line.
+
+    For Pascal the duplicate forward-decl + body pair is the rule, not
+    the exception, and (method) / (function) tells the reader nothing
+    about WHICH of the two they're looking at. The tree-sitter node
+    type IS the answer:
+
+      - declProc  → ``interface`` (forward declaration in the type's
+        ``interface`` section, no body)
+      - defProc   → ``implementation`` (the actual ``begin … end``
+        body in the unit's ``implementation`` section)
+
+    For other languages we keep the kind ('function', 'method', etc.)
+    since they don't have Pascal's split-section convention.
+    """
+    if language == "pascal" and node is not None:
+        if node.type == "declProc":
+            return "interface"
+        if node.type == "defProc":
+            return "implementation"
+    return sym.kind
 
 
 def _glob_to_regex(glob: str) -> str:
