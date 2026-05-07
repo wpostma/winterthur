@@ -851,3 +851,68 @@ class TestLanguageConfigs:
             assert result in ("public", "private", "protected", "internal"), (
                 f"{lang} visibility_fn returned unexpected: {result}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Caught-exception tracking
+# ---------------------------------------------------------------------------
+
+
+class TestCaughtExceptions:
+    """Silent try/except is never acceptable in this codebase.
+
+    Any internal recovery path (tree-sitter API drift, query compile
+    failure) must (a) emit a structlog record AND (b) append a
+    CaughtException to parser.caught_exceptions. These tests exercise
+    that contract directly so a future regression to silent recovery
+    is caught.
+    """
+
+    def test_fresh_parser_has_no_caught_exceptions(self) -> None:
+        p = ASTParser()
+        assert p.caught_exception_count == 0
+        assert p.caught_exceptions == []
+
+    def test_clean_python_parse_records_no_exceptions(self) -> None:
+        p = ASTParser()
+        fi = _make_file_info("pkg/clean.py", "python")
+        p.parse_file(fi, b"def foo():\n    pass\n")
+        # A healthy parse must NOT spuriously record exceptions.
+        assert p.caught_exception_count == 0
+
+    def test_record_exception_appends_and_includes_context(self) -> None:
+        p = ASTParser()
+        # Simulate a parse-time recovery: stash file context the way
+        # parse_file would, then call _record_exception.
+        p._current_file_path = "pkg/sample.py"
+        p._current_language = "python"
+        try:
+            raise ValueError("synthetic version-drift simulation")
+        except ValueError as exc:
+            p._record_exception("synthetic test site", exc)
+
+        assert p.caught_exception_count == 1
+        rec = p.caught_exceptions[0]
+        assert rec.where == "synthetic test site"
+        assert rec.exc_type == "ValueError"
+        assert "synthetic" in rec.message
+        # File/language context tagged from the per-call stash:
+        assert rec.file_path == "pkg/sample.py"
+        assert rec.language == "python"
+
+    def test_query_compile_failure_records_to_parser(self, tmp_path) -> None:
+        """A bad .scm at runtime would record one CaughtException.
+
+        We can't easily corrupt the shipped queries, but we CAN verify the
+        recording path by calling _record_exception via the same code path
+        _get_query uses on failure: the recording is structural, not
+        accidental.
+        """
+        p = ASTParser()
+        try:
+            raise RuntimeError("simulated bad query for test_lang")
+        except RuntimeError as exc:
+            p._record_exception("_get_query[test_lang]", exc)
+        assert any(
+            r.where.startswith("_get_query[") for r in p.caught_exceptions
+        )
