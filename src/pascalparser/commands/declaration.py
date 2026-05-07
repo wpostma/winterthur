@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 
 from ..io_helpers import file_info_from_path
+from ..metrics_walker import validate_structure
 from ..parser import ASTParser, _get_language
 from .parse import _PARSE_ERROR_DISCLAIMER, _BODY_CHILD_TYPES
 
@@ -176,6 +177,12 @@ def run(args: argparse.Namespace) -> int:
         )
 
     if tree.root_node.has_error:
+        # Surface the validator's specific line-numbered messages above the
+        # disclaimer — same pattern symbols and metrics use. "WARNING ...
+        # parser is probably broken" without saying WHERE leaves the user
+        # nothing to act on.
+        for msg in validate_structure(tree.root_node, source, file_info.language):
+            print(f"NOTE: {msg}", file=sys.stderr)
         print(_PARSE_ERROR_DISCLAIMER, file=sys.stderr)
 
     return 0
