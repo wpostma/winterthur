@@ -92,9 +92,16 @@ def _print_text(record: dict) -> None:
         print(f"  symbols ({len(syms)}):")
         for s in syms:
             kind = s.get("kind", "?")
-            qname = s.get("qualified_name") or s.get("name", "?")
             line = s.get("start_line", "?")
-            print(f"    {line:>5}  {kind:<12} {qname}")
+            # Display name: <Class>.<Method> for methods, just <Name>
+            # otherwise. The fully path-prefixed qualified_name carries
+            # uniqueness info needed by a future cross-file resolver, but
+            # it's pure noise in the per-file dump — the file is named
+            # right above this list.
+            name = s.get("name", "?")
+            parent = s.get("parent_name")
+            display = f"{parent}.{name}" if parent else name
+            print(f"    {line:>5}  {kind:<12} {display}")
     imps = record["imports"]
     if imps:
         print(f"  imports ({len(imps)}):")

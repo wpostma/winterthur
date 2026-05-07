@@ -160,6 +160,55 @@ uv run pascalparser parse path\to\Unit.pas --depth 4 --debug
 uv run pascalparser parse path\to\Unit.pas --errors-only
 ```
 
+### Subcommand: `symbols` (terse symbol & import dump)
+
+The most token-efficient view of a unit. **For LLM consumption this is
+often the right starting point** — it gives the full table of
+classes/methods/functions with line numbers in roughly one line per
+symbol, no body content, no metrics noise.
+
+```powershell
+uv run pascalparser symbols path\to\Unit.pas
+uv run pascalparser symbols path\to\Unit.pas --json   # machine-readable
+```
+
+Sample output for a real Delphi unit (text mode):
+
+```
+path\to\OrderDM.pas (pascal)
+  errors: 112
+  symbols (386):
+      100  class        TOrderSubType
+      125  class        TPriceScheduleInfo
+      127  method       TPriceScheduleInfo.GenerateCacheKey
+      143  class        TItemCard
+      206  method       TItemCards.AddItem
+      221  method       TItemCards.ProcessScanCards
+      226  class        TOrder
+      ...
+  imports (38):
+      Windows
+      Messages
+      ...
+```
+
+**Display rule**: methods are shown as `<Class>.<Method>`, top-level
+functions as bare `<Name>`. The full
+path-prefixed `qualified_name` (e.g. `path.to.Unit.TOrder.Method`)
+exists in the JSON output and on the underlying `Symbol` dataclass for
+future cross-file resolver use, but the text dump strips it because
+the file is named on the line directly above the symbol list — the
+prefix would be 386× redundant noise.
+
+When to reach for symbols vs metrics vs parse:
+
+| You want… | Use |
+|---|---|
+| "What's defined in this file? Just the names and lines." | `symbols` |
+| "What does this file's structure look like, with signatures and folded bodies?" | `parse --depth 3` |
+| "How complex is each function — if/case/loop/exit counts, nesting depth?" | `metrics` |
+| "Does this unit have a parse error, missing `end.`, begin/end imbalance?" | `metrics` (validates) or `parse --errors-only` |
+
 ### Subcommand: `metrics` (per-function structural metrics)
 
 ```powershell
