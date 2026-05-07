@@ -174,15 +174,15 @@ uv run pascalparser symbols path\to\Unit.pas --regex "^TOrder\." # filter to TOr
 uv run pascalparser symbols path\to\Unit.pas --regex "refund"    # case-insensitive substring
 ```
 
-`--regex PATTERN` filters symbols by Python regex match (`re.search`
-semantics) against the **display name** (`<Class>.<Method>` or bare
-`<Name>`). Case-insensitive by default — Pascal is — pass
-`--case-sensitive` if you want the literal pattern. The header line
-becomes `symbols (N of M matching /pattern/i)` so you see both the
-match count and the haystack size; an empty match prints
-`(no symbol names matched)` rather than silently emitting nothing.
-Imports are hidden when filtering — they're an unrelated wall when
-you're hunting for a name.
+`--regex PATTERN` filters by Python regex match (`re.search` semantics)
+against **both** symbol display names (`<Class>.<Method>` or bare
+`<Name>`) **and** import module paths (Pascal `uses ideal.bo.types`).
+Case-insensitive by default — Pascal is — pass `--case-sensitive` if
+you want the literal pattern. Each section's header becomes
+`symbols (N of M matching /pattern/i)` and `imports (N of M matching /pattern/i)`,
+so you see both the match count and the haystack size; an empty match
+prints `(no symbol names matched)` / `(no import paths matched)` rather
+than silently emitting nothing.
 
 **Side benefit**: regex filtering surfaces Pascal's duplicate
 forward-decl + body symbols. A method declared in `interface` and

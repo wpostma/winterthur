@@ -426,12 +426,22 @@ def loc_total_fallback(line_start: int, line_end: int) -> int:
     return max(0, line_end - line_start + 1)
 
 
+PARSE_ERROR_DISCLAIMER = (
+    "  WARNING: Parse errors DO NOT mean that the code is bad, it only "
+    "means the parser is probably broken.\n"
+    "           Use compilers to check syntax, not this tool."
+)
+
+
 def _print_text(output: dict) -> None:
     for file_record in output["files"]:
         print(f"\n{file_record['file']} ({file_record['language']})")
         print(f"  total_lines: {file_record['total_lines']}")
-        for msg in file_record.get("errors", []):
+        file_errors = file_record.get("errors", [])
+        for msg in file_errors:
             print(f"  MALFORMED: {msg}")
+        if file_errors:
+            print(PARSE_ERROR_DISCLAIMER)
         funcs = file_record["functions"]
         if not funcs:
             print("  (no functions)")

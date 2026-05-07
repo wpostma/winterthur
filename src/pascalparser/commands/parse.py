@@ -103,14 +103,28 @@ def run(args: argparse.Namespace) -> int:
     root = tree.root_node
 
     if args.errors_only:
-        return _run_errors_only(root, source)
+        rc = _run_errors_only(root, source)
+        if root.has_error:
+            print(_PARSE_ERROR_DISCLAIMER, file=sys.stderr)
+        return rc
 
     if args.debug:
         _print_node(root, source, depth=0, max_depth=args.depth)
+        if root.has_error:
+            print(_PARSE_ERROR_DISCLAIMER, file=sys.stderr)
         return 0 if not root.has_error else 1
 
     print(_render_source_view(root, source, file_info.language, args.depth))
+    if root.has_error:
+        print(_PARSE_ERROR_DISCLAIMER, file=sys.stderr)
     return 0 if not root.has_error else 1
+
+
+_PARSE_ERROR_DISCLAIMER = (
+    "WARNING: Parse errors DO NOT mean that the code is bad, it only "
+    "means the parser is probably broken.\n"
+    "         Use compilers to check syntax, not this tool."
+)
 
 
 # --------------------------------------------------------------------------- #

@@ -78,17 +78,26 @@ def run(args: argparse.Namespace) -> int:
 
         parsed = parser.parse_file(info, source)
         all_symbol_dicts = [_symbol_to_dict(s) for s in parsed.symbols]
+        all_import_dicts = [_import_to_dict(i) for i in parsed.imports]
+
         if pattern is not None:
-            filtered = [s for s in all_symbol_dicts if pattern.search(_display_name(s))]
+            filtered_symbols = [
+                s for s in all_symbol_dicts if pattern.search(_display_name(s))
+            ]
+            filtered_imports = [
+                i for i in all_import_dicts if pattern.search(_import_match_text(i))
+            ]
         else:
-            filtered = all_symbol_dicts
+            filtered_symbols = all_symbol_dicts
+            filtered_imports = all_import_dicts
 
         record = {
             "file": info.path,
             "language": info.language,
-            "symbols": filtered,
-            "symbols_total": len(all_symbol_dicts),  # for "N of M matching" header
-            "imports": [_import_to_dict(i) for i in parsed.imports],
+            "symbols": filtered_symbols,
+            "symbols_total": len(all_symbol_dicts),
+            "imports": filtered_imports,
+            "imports_total": len(all_import_dicts),
             "errors": _combined_errors(info.language, source, parsed.parse_errors),
         }
         if pattern is not None:
@@ -116,6 +125,17 @@ def _display_name(s: dict) -> str:
     name = s.get("name", "")
     parent = s.get("parent_name")
     return f"{parent}.{name}" if parent else name
+
+
+def _import_match_text(i: dict) -> str:
+    """Return the import string --regex is matched against.
+
+    Use ``module_path`` only — it's the normalised one-import-per-record
+    field. ``raw_statement`` carries the WHOLE `uses` clause for a Pascal
+    file, so matching against it would make every import in the same
+    clause match if any one of them did.
+    """
+    return str(i.get("module_path", "") or "")
 
 
 def _combined_errors(
@@ -165,6 +185,12 @@ def _import_to_dict(imp) -> dict:
 
 _ERROR_DISPLAY_CAP = 5  # show first N errors verbatim, summarise the rest
 
+PARSE_ERROR_DISCLAIMER = (
+    "  WARNING: Parse errors DO NOT mean that the code is bad, it only "
+    "means the parser is probably broken.\n"
+    "           Use compilers to check syntax, not this tool."
+)
+
 
 def _print_text(record: dict) -> None:
     print(f"\n{record['file']} ({record['language']})")
@@ -177,15 +203,17 @@ def _print_text(record: dict) -> None:
             print(f"    {msg}")
         if len(errors) > _ERROR_DISPLAY_CAP:
             print(f"    ... ({len(errors) - _ERROR_DISPLAY_CAP} more)")
+        print(PARSE_ERROR_DISCLAIMER)
     syms = record["symbols"]
     total = record.get("symbols_total", len(syms))
     regex = record.get("regex")
+
+    flag = "" if record.get("regex_case_sensitive") else "i"
 
     if regex is not None:
         # "12 of 386 matching /^TOrder\./i". Worth surfacing even when the
         # match count is 0 — that tells the user "your pattern is wrong"
         # instead of "this file has no symbols".
-        flag = "" if record.get("regex_case_sensitive") else "i"
         print(f"  symbols ({len(syms)} of {total} matching /{regex}/{flag}):")
         if not syms:
             print(f"    (no symbol names matched)")
@@ -205,9 +233,15 @@ def _print_text(record: dict) -> None:
         print(f"    {line:>5}  {kind:<12} {_display_name(s)}")
 
     imps = record["imports"]
-    if imps and regex is None:
-        # Hide imports when filtering symbols — the user is hunting for a
-        # specific name, the import list is an unrelated 38-line wall.
+    imps_total = record.get("imports_total", len(imps))
+    if regex is not None:
+        # When filtering, always show the imports section header so the
+        # user sees both haystack size and match count — `--regex` matches
+        # imports too (Pascal `uses ideal.bo.types`).
+        print(f"  imports ({len(imps)} of {imps_total} matching /{regex}/{flag}):")
+        if not imps:
+            print(f"    (no import paths matched)")
+    elif imps:
         print(f"  imports ({len(imps)}):")
-        for i in imps:
-            print(f"    {i.get('module_path', '?')}")
+    for i in imps:
+        print(f"    {i.get('module_path', '?')}")
