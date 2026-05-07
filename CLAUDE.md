@@ -433,6 +433,44 @@ multi-line block comments are handled correctly. A single blank line
 between the comment block and the declaration is tolerated; a larger
 gap means the comment is treated as belonging to something else.
 
+### Subcommand: `consts` (constant declarations)
+
+Const-only Pascal units (e.g. `unit foo.consts.bar; const … end.`) yield
+**zero records** from `symbols` and `metrics` — those tools target
+callable shapes. `consts` fills the gap: list every `declConst` in a
+file with its line, name, and full text.
+
+```powershell
+# Dump every const in a file
+uv run pascalparser consts path\to\foo.consts.commerce.pas
+
+# Filter by glob
+uv run pascalparser consts path\to\foo.consts.commerce.pas "bt_*"
+
+# Regex if glob isn't enough
+uv run pascalparser consts path\to\OrderDM.pas "WaiverMode.*" --regex
+```
+
+Sample on a real const-only unit:
+
+```
+# path\to\foo.consts.commerce.pas: 17 of 17 constants
+     10  bt_ItemButton = 0;
+     11  bt_PageButton = 1;
+     12  bt_GoToLastScreen = 2;
+     18  bt_Exit      = 8;
+     24  bt_Static = 14;
+     33  bt_ExperienceTimes = 68;
+     41  st_AlternateA   = 0;
+     ...
+```
+
+The header line tells you `N of M` so you see both match count and
+total population. Default `--limit` is 200 (much higher than other
+subcommands; const files often run hundreds of entries). Pattern
+syntax matches `declaration`: glob default, `--regex` to switch,
+case-insensitive unless `--case-sensitive`.
+
 ### Subcommand: `metrics` (per-function structural metrics)
 
 ```powershell
