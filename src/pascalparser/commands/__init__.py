@@ -11,8 +11,16 @@ modules to assemble the top-level parser.
 
 from __future__ import annotations
 
-from . import doctor, metrics, parse, smells, symbols
+from . import declaration, doctor, metrics, parse, smells, symbols
 
-ALL_COMMANDS = (doctor, metrics, parse, smells, symbols)
+ALL_COMMANDS = (doctor, declaration, metrics, parse, smells, symbols)
 
-__all__ = ["ALL_COMMANDS", "doctor", "metrics", "parse", "smells", "symbols"]
+__all__ = [
+    "ALL_COMMANDS",
+    "declaration",
+    "doctor",
+    "metrics",
+    "parse",
+    "smells",
+    "symbols",
+]

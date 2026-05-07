@@ -270,6 +270,134 @@ When to reach for symbols vs metrics vs parse:
 | "How complex is each function — if/case/loop/exit counts, nesting depth?" | `metrics` |
 | "Does this unit have a parse error, missing `end.`, begin/end imbalance?" | `metrics` (validates) or `parse --errors-only` |
 
+### Subcommand: `declaration` (full signature, with overloads)
+
+When you need to know how to call a method, not just that it exists.
+Symbol-targeted, glob-by-default, prints the full multi-line parameter
+list and return type. Pascal/C++/etc. **overloads matching the same
+pattern are ALL printed** — overloading is the natural reason this
+command exists.
+
+```powershell
+# One method, full signature
+uv run pascalparser declaration path\to\OrderDM.pas TOrder.AddNormalItem
+
+# All overloads of a name (glob)
+uv run pascalparser declaration path\to\OrderDM.pas "TOrder.AddNormalItem*"
+
+# Family search: every TOrder.Calculate* method
+uv run pascalparser declaration path\to\OrderDM.pas "TOrder.Calculate*"
+
+# Use a real regex if glob isn't expressive enough
+uv run pascalparser declaration path\to\OrderDM.pas "TOrder\.(Add|Insert)Item.*" --regex
+```
+
+Sample for `TOrder.AddNormalItem*` (3 overloads shown):
+
+```
+path\to\OrderDM.pas:872  (method)
+----------------------------------------------------------------------
+function AddNormalItem(
+                const ModalParent: TCustomForm;
+                const ItemNumber : integer;
+                const MasterID : TGUID;
+                ...
+                var ItemState:TOrderItemState) : TGUID; overload;
+
+path\to\OrderDM.pas:884  (method)
+----------------------------------------------------------------------
+function AddNormalItem(
+                const ModalParent: TCustomForm;
+                const ItemNumber : integer;
+                const Quantity:Integer;
+                ...
+                var ItemState:TOrderItemState) : TGUID; overload;
+```
+
+Pattern matches use `re.fullmatch` semantics (anchored) by default, since
+the typical use is "show me **this specific** symbol family." For
+substring/contains-style searches use `symbols --regex` instead.
+
+The default `--limit` is 10 (handles most overload sets); raise it for
+broad globs like `"*.Add*"` that match dozens.
+
+**Family-search example.** Asking "what does this class do, by
+prefix?" against a real ~7000-line Delphi unit:
+
+```powershell
+uv run pascalparser declaration path\to\OrderDM.pas "TOrder.R*" --limit 30
+```
+
+Yields the full signatures of every `TOrder` method whose name starts
+with `R` — refresh, reset, refund, replace, reallocate, reassign,
+reinstate, recall, recalc, remove, etc. Excerpt:
+
+```
+path\to\OrderDM.pas:605  (method)
+----------------------------------------------------------------------
+procedure RefreshItemsOnce;
+
+path\to\OrderDM.pas:683  (method)
+----------------------------------------------------------------------
+function ReplaceQuantitySeatCheckAndID(const Fields : string; Qty : integer;
+      SeatNumber, CheckNumber : Integer; var NewID : TGuid) : string;
+
+path\to\OrderDM.pas:715  (method)
+----------------------------------------------------------------------
+procedure ResetPayments;
+
+path\to\OrderDM.pas:720  (method)
+----------------------------------------------------------------------
+procedure ResetLocalOrders(const KeepLock: boolean = false);
+
+path\to\OrderDM.pas:977  (method)
+----------------------------------------------------------------------
+procedure ReAllocateWorkingPackageItems(
+        const OrderItemID: TGUID;
+        const PackageQuantity:Integer;
+        AmountToAllocate: currency;
+        const TaxItemsInPackage: boolean;
+        const TaxIncluded : Currency);
+```
+
+The point: `symbols --regex "TOrder.R"` would list 25 names; this gives
+you the **call shapes**, ready to paste into code or feed to an LLM
+that needs to figure out which overload to use.
+
+**Leading-wildcard pattern: enumerate event handlers.** Delphi forms
+typically have dozens of `OnClick` handlers named `<Button>ButtonClick`.
+A trailing-anchor glob fetches them all in one call:
+
+```powershell
+uv run pascalparser declaration path\to\MainMenu.pas "*ButtonClick"
+```
+
+Excerpt from a real form unit:
+
+```
+path\to\MainMenu.pas:863  (function)
+----------------------------------------------------------------------
+procedure TIPMainMenu.DrawerManagerButtonClick(Sender: TObject);
+
+path\to\MainMenu.pas:991  (function)
+----------------------------------------------------------------------
+procedure TIPMainMenu.AuthorizedCreditCardChargesButtonClick(Sender: TObject);
+
+path\to\MainMenu.pas:1001  (function)
+----------------------------------------------------------------------
+procedure TIPMainMenu.MovieReportsButtonClick(Sender: TObject);
+
+... (24 total)
+```
+
+**Leading comments are pulled in.** When Pascal source has comments
+immediately above a declaration (any flavour — `//`, `{ … }`,
+`(* … *)`, `///`-doc), they're included verbatim above the signature.
+Comment blocks are detected via tree-sitter `comment` nodes, so
+multi-line block comments are handled correctly. A single blank line
+between the comment block and the declaration is tolerated; a larger
+gap means the comment is treated as belonging to something else.
+
 ### Subcommand: `metrics` (per-function structural metrics)
 
 ```powershell
