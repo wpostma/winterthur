@@ -169,8 +169,28 @@ symbol, no body content, no metrics noise.
 
 ```powershell
 uv run pascalparser symbols path\to\Unit.pas
-uv run pascalparser symbols path\to\Unit.pas --json   # machine-readable
+uv run pascalparser symbols path\to\Unit.pas --json              # machine-readable
+uv run pascalparser symbols path\to\Unit.pas --regex "^TOrder\." # filter to TOrder methods
+uv run pascalparser symbols path\to\Unit.pas --regex "refund"    # case-insensitive substring
 ```
+
+`--regex PATTERN` filters symbols by Python regex match (`re.search`
+semantics) against the **display name** (`<Class>.<Method>` or bare
+`<Name>`). Case-insensitive by default — Pascal is — pass
+`--case-sensitive` if you want the literal pattern. The header line
+becomes `symbols (N of M matching /pattern/i)` so you see both the
+match count and the haystack size; an empty match prints
+`(no symbol names matched)` rather than silently emitting nothing.
+Imports are hidden when filtering — they're an unrelated wall when
+you're hunting for a name.
+
+**Side benefit**: regex filtering surfaces Pascal's duplicate
+forward-decl + body symbols. A method declared in `interface` and
+defined in `implementation` shows up as two records (one with
+`kind=method, parent=TOrder, name=Foo`, one with
+`kind=function, parent=None, name=TOrder.Foo`), both rendering to the
+same display string, so a regex that targets the display string finds
+the pair in one go.
 
 Sample output for a real Delphi unit (text mode):
 
