@@ -1,14 +1,18 @@
 # winterthur
 
-<img src="docs/images/Niklaus_Wirth_large.jpg" alt="Niklaus Wirth" width="180" align="right" />
+<img src="docs/images/wirth.webp" alt="Niklaus Wirth" width="180" align="right" />
 
 Multi-language source parser + lint and metrics tooling, built on
-tree-sitter. First-class support for **Pascal/Delphi** (the original
-motivation) plus Python, Rust, TypeScript, JavaScript, Java, Go, and
-C/C++. C# coverage is a planned extension.
+tree-sitter. First-class support for **Pascal/Delphi** and **Python**, with secondary support for Rust, TypeScript, JavaScript, Java, Go, and C/C++. C# coverage is a planned extension.
 
 Named for **Winterthur**, the Swiss city where Niklaus Wirth — creator
-of the Pascal language — was born in 1934.
+of the Pascal, Modula-2 and Oberon languages — was born in 1934.
+
+The purpose of this tooling is to provide higher level tooling for automated and agentic/LLM driven code parsing, searching, and indexing tasks.
+
+This tool is not a code indexer, it is purely a multi-language parser with a variety of code searching tools.
+
+<img src="docs/images/Merian_Winterthur_1642.jpg" />
 
 ## Goals
 
@@ -16,7 +20,7 @@ of the Pascal language — was born in 1934.
   `.dpk` / `.inc` files (or single-file source in any supported
   language) and produce per-function metrics + smell findings.
   No `.dproj`, no compile, no `.dcu` resolution. Tree-sitter only.
-- **Plug into the `codereview` Claude Code skill.** The CLI emits the
+- **Plug into any `codereview` Claude Code skills you want to use it with.** The CLI emits the
   JSON contract documented in
   `~/.claude/skills/codereview/metrics-tool-spec.md` so the skill can
   consume it without bespoke glue.
