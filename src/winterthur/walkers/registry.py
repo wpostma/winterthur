@@ -12,11 +12,13 @@ from __future__ import annotations
 from .base import LanguageWalker
 from .pascal import PascalWalker
 from .python import PythonWalker
+from .typescript import TypeScriptWalker
 
 
 _WALKERS: dict[str, LanguageWalker] = {
     "pascal": PascalWalker(),
     "python": PythonWalker(),
+    "typescript": TypeScriptWalker(),
 }
 
 
