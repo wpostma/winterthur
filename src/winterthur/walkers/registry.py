@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from .base import LanguageWalker
 from .pascal import PascalWalker
+from .python import PythonWalker
 
 
 _WALKERS: dict[str, LanguageWalker] = {
     "pascal": PascalWalker(),
+    "python": PythonWalker(),
 }
 
 

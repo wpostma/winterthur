@@ -157,17 +157,47 @@ class LanguageWalker:
 def walk_function(
     fn_node, source: bytes, walker: LanguageWalker
 ) -> FunctionMetrics:
-    """Walk one function subtree and return its :class:`FunctionMetrics`."""
+    """Walk one function subtree and return its :class:`FunctionMetrics`.
+
+    Nested function definitions encountered below ``fn_node`` are
+    skipped; they get their own metrics record from the outer
+    :func:`collect_function_metrics` iteration. This keeps an outer
+    function's counters clean of its inner functions' bodies — important
+    for Python (decorators, closures) and the right thing for Pascal's
+    local procedures too.
+    """
     ctx = WalkContext(metrics=FunctionMetrics())
-    _walk(fn_node, walker, ctx)
+    _walk(fn_node, walker, ctx, is_root=True)
     walker.extract_signature(fn_node, source, ctx.metrics)
     walker.count_result_assignments(fn_node, source, ctx.metrics)
     return ctx.metrics
 
 
-def _walk(node, walker: LanguageWalker, ctx: WalkContext) -> None:
-    """Recursive counting walk. ``ctx.metrics`` is mutated in place."""
+def _walk(
+    node, walker: LanguageWalker, ctx: WalkContext, *, is_root: bool
+) -> None:
+    """Recursive counting walk. ``ctx.metrics`` is mutated in place.
+
+    When *is_root* is False and *node* is a function-defining node, the
+    subtree is skipped entirely — the inner function gets its own walk
+    via :func:`collect_function_metrics`, so attributing its body to
+    the outer would double-count.
+    """
+    if not is_root and node.type in walker.function_node_types:
+        return
+
     walker.pre_visit(node, ctx)
+
+    # Anonymous nodes (keywords like `def`, `lambda`, punctuation like
+    # `:`/`(`) share their type-name with the surrounding AST node in
+    # some grammars — tree-sitter-python's `lambda` keyword inside the
+    # `lambda` AST node is the canonical example. Counter dispatch must
+    # only run on named nodes to avoid double-counting; we still
+    # descend so that named children of unnamed wrappers aren't lost.
+    if not node.is_named:
+        for c in node.children:
+            _walk(c, walker, ctx, is_root=False)
+        return
 
     t = node.type
     kinds = walker.decision_kinds
@@ -224,7 +254,7 @@ def _walk(node, walker: LanguageWalker, ctx: WalkContext) -> None:
             m.max_nesting_depth = ctx.depth
 
     for c in node.children:
-        _walk(c, walker, ctx)
+        _walk(c, walker, ctx, is_root=False)
 
     if pushed_nest:
         ctx.depth -= 1

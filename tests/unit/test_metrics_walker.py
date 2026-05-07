@@ -536,21 +536,23 @@ end.
 # ---------------------------------------------------------------------------
 
 
-class TestNonPascalLanguage:
-    def test_python_returns_empty_metrics_dict(self) -> None:
-        # Python has no walker support yet; the contract is "no metrics,
-        # no crash." Once walkers/python.py lands, this assertion changes.
-        lang = _get_language("python")
+class TestUnsupportedLanguage:
+    def test_unknown_language_returns_empty_metrics_dict(self) -> None:
+        # No walker registered for "rust" yet; contract is empty dict, no crash.
+        # Use a Pascal tree as a stand-in — collect_function_metrics never
+        # actually consults the tree's grammar when the language tag has no
+        # walker.
+        lang = _get_language("pascal")
         if lang is None:
-            pytest.skip("tree-sitter-python grammar not loaded")
-        src = b"def foo():\n    if True:\n        pass\n"
+            pytest.skip("tree-sitter-pascal grammar not loaded")
+        src = b"unit T; interface implementation end."
         tree = Parser(lang).parse(src)
-        assert collect_function_metrics(tree.root_node, src, "python") == {}
+        assert collect_function_metrics(tree.root_node, src, "rust") == {}
 
-    def test_python_validate_returns_empty(self) -> None:
-        lang = _get_language("python")
+    def test_unknown_language_validate_returns_empty(self) -> None:
+        lang = _get_language("pascal")
         if lang is None:
-            pytest.skip("tree-sitter-python grammar not loaded")
-        src = b"def foo(): pass\n"
+            pytest.skip("tree-sitter-pascal grammar not loaded")
+        src = b"unit T; interface implementation end."
         tree = Parser(lang).parse(src)
-        assert validate_structure(tree.root_node, src, "python") == []
+        assert validate_structure(tree.root_node, src, "rust") == []
