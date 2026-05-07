@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from .base import SmellFinder
 from .pascal import PascalSmellFinder
+from .python import PythonSmellFinder
 
 
 _FINDERS: dict[str, SmellFinder] = {
     "pascal": PascalSmellFinder(),
+    "python": PythonSmellFinder(),
 }
 
 

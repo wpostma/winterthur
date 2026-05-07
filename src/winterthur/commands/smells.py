@@ -38,7 +38,7 @@ from ..metrics_walker import (
     validate_structure,
 )
 from ..parser import _get_language
-from ..smells_walker import SmellHit, find_pascal_smells
+from ..smells import SmellHit, get_finder
 from ..walkers import get_walker
 from ..walkers.base import _iter_descendants
 
@@ -71,7 +71,11 @@ RULE_NAMES = {
     "L3": "deep-nesting",
     "P1": "many-params",
     "A4": "multiple-exits",
-    "W1": "with-statement",
+    "W1": "with-statement",         # Pascal-only smell
+    # Python-specific AST patterns:
+    "E1": "bare-except",            # except: catches BaseException
+    "E2": "silent-except",          # except X: pass — swallowed
+    "M1": "mutable-default-arg",    # def f(x=[]) shared-list footgun
 }
 
 # Severity ordering for sorted output (red first).
@@ -208,7 +212,8 @@ def _scan_file(info, source: bytes, rule_filter: set[str] | None) -> dict:
 
     metrics = collect_function_metrics(tree.root_node, source, info.language)
     structural_errors = validate_structure(tree.root_node, source, info.language)
-    ast_hits = find_pascal_smells(tree.root_node, source, info.language)
+    finder = get_finder(info.language)
+    ast_hits = finder.find(tree.root_node, source) if finder is not None else []
 
     function_names = _function_qualified_names(tree.root_node, source, info.language)
 
@@ -299,7 +304,16 @@ def _ast_findings(
     # Severity policy for AST-pattern smells. Keep the table even with one
     # entry — adding rules later (swallowed exceptions, SQL string interp,
     # etc.) needs the same shape.
-    severity_for_rule = {"W1": SEVERITY_YELLOW}
+    severity_for_rule = {
+        "W1": SEVERITY_YELLOW,
+        # E1 catches SystemExit/KeyboardInterrupt — almost always a bug.
+        "E1": SEVERITY_RED,
+        # E2 (silent pass) is sometimes deliberate (best-effort cleanup);
+        # surface it but don't escalate.
+        "E2": SEVERITY_YELLOW,
+        # M1 is a real correctness bug; classic Python footgun.
+        "M1": SEVERITY_RED,
+    }
 
     for h in hits:
         qual: str | None = None
