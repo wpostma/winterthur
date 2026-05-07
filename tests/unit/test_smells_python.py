@@ -211,6 +211,196 @@ def f(a=None, b=0, c='', d=(1, 2), e=3.14, g=True):
 
 
 # ---------------------------------------------------------------------------
+# D1: missing-docstring on a non-trivial public function
+# ---------------------------------------------------------------------------
+
+
+class TestMissingDocstring:
+    """D1 fires when a public, non-trivial function has no docstring.
+
+    Public = name does not start with ``_`` (so private helpers and
+    dunders are exempt). Non-trivial = clears at least one of:
+    >= 5 source lines, >= 3 non-self/cls params, any mutable-typed
+    param.
+    """
+
+    def test_long_public_function_no_docstring_fires(self) -> None:
+        # 6-line public function, no docstring -> "6 lines" signal.
+        rec = _scan("""\
+def render(template, data):
+    result = []
+    for k, v in data.items():
+        result.append(f'{k}={v}')
+    body = '|'.join(result)
+    return template.format(body=body)
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert d1[0]["severity"] == "yellow"
+        assert "lines" in d1[0]["detail"]
+        assert d1[0]["function"] == "render"
+
+    def test_function_with_docstring_does_not_fire(self) -> None:
+        rec = _scan('''\
+def render(template, data):
+    """Render template with the given data dict."""
+    result = []
+    for k, v in data.items():
+        result.append(f'{k}={v}')
+    return template.format(body='|'.join(result))
+''')
+        assert _findings_for(rec, "D1") == []
+
+    def test_underscore_prefix_skipped(self) -> None:
+        # Long, no docstring — but private. No D1.
+        rec = _scan("""\
+def _internal_helper(template, data):
+    result = []
+    for k, v in data.items():
+        result.append(f'{k}={v}')
+    body = '|'.join(result)
+    return template.format(body=body)
+""")
+        assert _findings_for(rec, "D1") == []
+
+    def test_dunder_skipped(self) -> None:
+        # __init__ is exempt because the rule is "starts with _" and
+        # dunders share that prefix. Long body, but no D1.
+        rec = _scan("""\
+class C:
+    def __init__(self, a, b, c, d):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.d = d
+""")
+        assert _findings_for(rec, "D1") == []
+
+    def test_tiny_function_skipped(self) -> None:
+        # 3 lines, 2 params, no mutable, no docstring -> trivial -> no D1.
+        rec = _scan("""\
+def add(a, b):
+    return a + b
+""")
+        assert _findings_for(rec, "D1") == []
+
+    def test_three_visible_params_triggers(self) -> None:
+        # Short body but 3 params -> param-count signal trips.
+        rec = _scan("""\
+def configure(host, port, db):
+    return None
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert "3 params" in d1[0]["detail"]
+
+    def test_self_does_not_count_toward_param_threshold(self) -> None:
+        # Method with self + 2 args -> 2 visible -> trivial -> no D1.
+        rec = _scan("""\
+class C:
+    def two_args(self, a, b):
+        return a + b
+""")
+        assert _findings_for(rec, "D1") == []
+
+    def test_method_with_three_visible_args_triggers(self) -> None:
+        # self + 3 args -> 3 visible -> D1 fires.
+        rec = _scan("""\
+class C:
+    def three_args(self, a, b, c):
+        return a + b + c
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert d1[0]["function"] == "C.three_args"
+
+    def test_cls_excluded_like_self(self) -> None:
+        rec = _scan("""\
+class C:
+    @classmethod
+    def factory(cls, a, b):
+        return cls()
+""")
+        assert _findings_for(rec, "D1") == []
+
+    def test_mutable_list_annotation_triggers(self) -> None:
+        rec = _scan("""\
+def append_to(items: list, value):
+    items.append(value)
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert "mutable: items" in d1[0]["detail"]
+
+    def test_mutable_dict_annotation_triggers(self) -> None:
+        rec = _scan("""\
+def update_with(target: dict, key, value):
+    target[key] = value
+""")
+        d1 = _findings_for(rec, "D1")
+        # Note: also has 3 params, so both signals trip; just confirm fire.
+        assert len(d1) == 1
+        assert "mutable: target" in d1[0]["detail"]
+
+    def test_subscripted_list_annotation_triggers(self) -> None:
+        # `list[int]` head is `list` -> mutable.
+        rec = _scan("""\
+def total(values: list[int]):
+    return sum(values)
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert "mutable: values" in d1[0]["detail"]
+
+    def test_typing_dict_annotation_triggers(self) -> None:
+        # ``Dict[str, int]`` head is ``Dict``.
+        rec = _scan("""\
+def merge(left: Dict[str, int], right):
+    left.update(right)
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        assert "mutable: left" in d1[0]["detail"]
+
+    def test_immutable_annotations_do_not_trigger_mutable_signal(self) -> None:
+        # `int` and `str` heads are not in the mutable set.
+        rec = _scan("""\
+def add(a: int, b: int) -> int:
+    return a + b
+""")
+        # Trivial -> no D1.
+        assert _findings_for(rec, "D1") == []
+
+    def test_optional_wrapper_not_seen_as_mutable(self) -> None:
+        # Known limitation documented in _annotation_head_name: we only
+        # look at the outer head identifier. ``Optional[list]`` reads as
+        # head=``Optional`` and does NOT trigger the mutable signal.
+        rec = _scan("""\
+def process(x: Optional[list]):
+    return x
+""")
+        # Tiny function, no other signal -> no D1.
+        assert _findings_for(rec, "D1") == []
+
+    def test_multiple_signals_combined_in_detail(self) -> None:
+        # Long + many params + mutable -> all three reported in detail.
+        rec = _scan("""\
+def configure(host, port, db, options: list):
+    log.info('configuring')
+    if options:
+        for opt in options:
+            apply(opt)
+    connect(host, port, db)
+""")
+        d1 = _findings_for(rec, "D1")
+        assert len(d1) == 1
+        detail = d1[0]["detail"]
+        assert "lines" in detail
+        assert "params" in detail
+        assert "mutable: options" in detail
+
+
+# ---------------------------------------------------------------------------
 # Metric-driven rules on Python (via walkers/python.py)
 # ---------------------------------------------------------------------------
 

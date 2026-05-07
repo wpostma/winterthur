@@ -76,6 +76,7 @@ RULE_NAMES = {
     "E1": "bare-except",            # except: catches BaseException
     "E2": "silent-except",          # except X: pass — swallowed
     "M1": "mutable-default-arg",    # def f(x=[]) shared-list footgun
+    "D1": "missing-docstring",      # public non-trivial function lacks doc
 }
 
 # Severity ordering for sorted output (red first).
@@ -313,6 +314,8 @@ def _ast_findings(
         "E2": SEVERITY_YELLOW,
         # M1 is a real correctness bug; classic Python footgun.
         "M1": SEVERITY_RED,
+        # D1 is advisory: missing docstring on a non-trivial public API.
+        "D1": SEVERITY_YELLOW,
     }
 
     for h in hits:
