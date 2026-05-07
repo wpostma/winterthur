@@ -82,7 +82,7 @@ def run(args: argparse.Namespace) -> int:
 
         if pattern is not None:
             filtered_symbols = [
-                s for s in all_symbol_dicts if pattern.search(_display_name(s))
+                s for s in all_symbol_dicts if pattern.search(_symbol_match_text(s))
             ]
             filtered_imports = [
                 i for i in all_import_dicts if pattern.search(_import_match_text(i))
@@ -121,10 +121,24 @@ def run(args: argparse.Namespace) -> int:
 
 
 def _display_name(s: dict) -> str:
-    """Return the display form used by the text printer and matched by --regex."""
+    """Return the display form used by the text printer."""
     name = s.get("name", "")
     parent = s.get("parent_name")
     return f"{parent}.{name}" if parent else name
+
+
+def _symbol_match_text(s: dict) -> str:
+    """Return the haystack --regex is searched against for a symbol.
+
+    Includes the display name AND the full signature (parameter list +
+    return type) so a query like ``--regex "TAgeRange"`` finds methods
+    that take a TAgeRange parameter, not just methods named after the
+    type. Joining with newlines means a regex like ``"foo.*bar"`` won't
+    accidentally bridge from the name to the signature.
+    """
+    return "\n".join(
+        x for x in (_display_name(s), s.get("signature", "")) if x
+    )
 
 
 def _import_match_text(i: dict) -> str:

@@ -192,6 +192,47 @@ defined in `implementation` shows up as two records (one with
 same display string, so a regex that targets the display string finds
 the pair in one go.
 
+**Useful patterns**
+
+Multi-keyword alternation is the killer combination — find every
+symbol or import related to any of N concepts in one query:
+
+```powershell
+uv run pascalparser symbols path\to\OrderDM.pas --regex "(types|age|collection)"
+```
+
+Sample output on a real ~7000-line Delphi unit:
+
+```
+path\to\OrderDM.pas (pascal)
+  errors (1):
+    parse error starting at line 1558
+  WARNING: Parse errors DO NOT mean that the code is bad, it only means the parser is probably broken.
+           Use compilers to check syntax, not this tool.
+  symbols (6 of 386 matching /(types|age|collection)/i):
+      973  method       TOrder.ReAllocatePackages
+      974  method       TOrder.ReAllocatePackage
+      977  method       TOrder.ReAllocateWorkingPackageItems
+      984  method       TOrder.AddModifierItemsToPackageItems
+     1233  function     LoggedMessageDlg
+     6795  function     ProcessTaxTypes
+  imports (7 of 109 matching /(types|age|collection)/i):
+    System.UITypes
+    System.Generics.Collections
+    app.bo.cards.management
+    PackageQuantityAdd
+    app.bo.types
+    app.age.utils
+    third_party.collections
+```
+
+The "of 386" / "of 109" denominators tell you the total population
+size, so 6/386 reads as "rare" and 7/109 as "non-trivial chunk." This
+form is hard to replicate with `grep` because grep doesn't know which
+hits are class-name parents vs unqualified function names vs unit
+imports — and the summary headers can't be generated because grep just
+streams matched lines.
+
 Sample output for a real Delphi unit (text mode):
 
 ```
