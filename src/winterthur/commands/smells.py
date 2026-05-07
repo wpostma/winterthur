@@ -33,14 +33,14 @@ from pathlib import Path
 
 from ..io_helpers import file_info_from_path
 from ..metrics_walker import (
-    NODE_KINDS_BY_LANGUAGE,
     FunctionMetrics,
-    _iter_descendants,
     collect_function_metrics,
     validate_structure,
 )
 from ..parser import _get_language
 from ..smells_walker import SmellHit, find_pascal_smells
+from ..walkers import get_walker
+from ..walkers.base import _iter_descendants
 
 
 # Severity bands match smells.md's red/yellow/green convention. Red is a
@@ -184,7 +184,18 @@ def _scan_file(info, source: bytes, rule_filter: set[str] | None) -> dict:
 
     try:
         from tree_sitter import Parser as _Parser
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — install-integrity guard, logged
+        # tree_sitter import failing here means the winterthur install is
+        # broken (parser.py also imports it unconditionally). Surface both
+        # via the structured log AND inline in the file record so the user
+        # sees something actionable.
+        import structlog
+        structlog.get_logger(__name__).warning(
+            "tree_sitter import failed in smells command",
+            error=str(exc),
+            file_path=info.path,
+            language=info.language,
+        )
         return {
             "file": info.path,
             "language": info.language,
@@ -322,11 +333,11 @@ def _function_qualified_names(
     """
     if language != "pascal":
         return {}
-    kinds = NODE_KINDS_BY_LANGUAGE.get(language)
-    if kinds is None:
+    walker = get_walker(language)
+    if walker is None:
         return {}
     out: dict[tuple[int, int], tuple[int, str]] = {}
-    fn_kinds = kinds["function_def"]
+    fn_kinds = walker.function_node_types
     for node in _iter_descendants(root_node):
         if node.type not in fn_kinds:
             continue

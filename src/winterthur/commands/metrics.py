@@ -328,7 +328,17 @@ def _walker_results_for(
         return {}, []
     try:
         from tree_sitter import Parser as _Parser
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — install-integrity guard, logged
+        # tree_sitter import failing here means the winterthur install is
+        # broken (parser.py also imports it at module top level). Loud
+        # warning so the failure is visible; empty result lets the caller
+        # degrade rather than crash the whole CLI.
+        import structlog
+        structlog.get_logger(__name__).warning(
+            "tree_sitter import failed in metrics walker",
+            error=str(exc),
+            language=language,
+        )
         return {}, []
     ts_parser = _Parser(ts_language)
     tree = ts_parser.parse(source)
@@ -412,10 +422,10 @@ def _effective_loc(source: bytes, line_start: int, line_end: int) -> int:
     """
     if line_start <= 0 or line_end < line_start:
         return 0
-    try:
-        text = source.decode("utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        return loc_total_fallback(line_start, line_end)
+    # bytes.decode(..., errors="replace") is total — it never raises, so the
+    # previous try/except wrapper here was dead code (and a noqa: BLE001
+    # site that hid that fact). Decode unconditionally.
+    text = source.decode("utf-8", errors="replace")
     lines = text.splitlines()
     span = lines[line_start - 1:line_end]
     count = 0

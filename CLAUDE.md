@@ -119,42 +119,13 @@ outline of a file without loading the whole thing.
 | `--depth 2` | Adds one level of nesting — the contents of `type` blocks, the top-level statements inside each function (but their nested control-flow bodies are still folded). | Skimming a unit's public API plus a hint of how its big procedures are structured. |
 | `--depth 3` | The sweet spot for a god-method audit on a real Delphi unit. Procedure bodies show their top-level `if` / `case` / `try` shape; only the deepest blocks are folded. | The depth Warren reaches for most often when reviewing legacy Pascal. |
 
-Real example on a ~190-line Delphi unit at `--depth 3`:
+At `--depth 3`, the parse command shows:
+- Module/unit declarations and `interface`/`implementation` sections
+- Type block signatures (bodies folded)
+- Procedure/function headers with their exact line ranges for full bodies
+- Top-level control-flow shape inside each function (if/case/try blocks preserved, but nested bodies folded)
 
-```pascal
-unit ManagerMenu;
-
-interface
-
-uses
-  // ... (lines 11-13 elided)
-
-type
-// ... (lines 17-62 elided)
-
-implementation
-
-uses
-  // ... (lines 68-80 elided)
-
-{$R *.DFM}
-
-procedure TManagerForm.ShowMenu(const Drawer, EmployeeUniqueID: Integer);
-// ... (lines 85-114 elided)
-
-procedure TManagerForm.PullButtonClick(Sender: TObject);
-// ... (lines 118-139 elided)
-
-procedure TManagerForm.ReportButtonClick(Sender: TObject);
-// ... (lines 142-145 elided)
-
-procedure TManagerForm.CashOutClick(Sender: TObject);
-// ... (lines 154-171 elided)
-```
-
-The signature of every procedure is preserved; bodies are folded with
-their exact line ranges so you can ask the user (or yourself) "show me
-lines 85-114" when one looks worth reading in full. **For Pascal,
+This view lets you ask "show me lines 85-114" when a folded range looks worth reading in full. **For Pascal,
 `--depth 3` is usually the right starting point.** For Python files
 `--depth 1` is often enough; `--depth 2` reveals nested function
 bodies.
@@ -212,60 +183,16 @@ Multi-keyword alternation is the killer combination — find every
 symbol or import related to any of N concepts in one query:
 
 ```powershell
-uv run winterthur symbols path\to\OrderDM.pas --regex "(types|age|collection)"
+uv run winterthur symbols path\to\file --regex "(pattern1|pattern2|pattern3)"
 ```
 
-Sample output on a real ~7000-line Delphi unit:
+The `symbols` command with regex returns:
+- Classes, functions, procedures, methods with their line numbers
+- Symbol count: `symbols (M matching /pattern/) out of (N total)`
+- Imports matching the same pattern
+- Parse errors, if any, with a disclaimer that parse errors indicate grammar gaps, not bad code
 
-```
-path\to\OrderDM.pas (pascal)
-  errors (1):
-    parse error starting at line 1558
-  WARNING: Parse errors DO NOT mean that the code is bad, it only means the parser is probably broken.
-           Use compilers to check syntax, not this tool.
-  symbols (6 of 386 matching /(types|age|collection)/i):
-      973  method       TOrder.ReAllocatePackages
-      974  method       TOrder.ReAllocatePackage
-      977  method       TOrder.ReAllocateWorkingPackageItems
-      984  method       TOrder.AddModifierItemsToPackageItems
-     1233  function     LoggedMessageDlg
-     6795  function     ProcessTaxTypes
-  imports (7 of 109 matching /(types|age|collection)/i):
-    System.UITypes
-    System.Generics.Collections
-    app.bo.cards.management
-    PackageQuantityAdd
-    app.bo.types
-    app.age.utils
-    third_party.collections
-```
-
-The "of 386" / "of 109" denominators tell you the total population
-size, so 6/386 reads as "rare" and 7/109 as "non-trivial chunk." This
-form is hard to replicate with `grep` because grep doesn't know which
-hits are class-name parents vs unqualified function names vs unit
-imports — and the summary headers can't be generated because grep just
-streams matched lines.
-
-Sample output for a real Delphi unit (text mode):
-
-```
-path\to\OrderDM.pas (pascal)
-  errors: 112
-  symbols (386):
-      100  class        TOrderSubType
-      125  class        TPriceScheduleInfo
-      127  method       TPriceScheduleInfo.GenerateCacheKey
-      143  class        TItemCard
-      206  method       TItemCards.AddItem
-      221  method       TItemCards.ProcessScanCards
-      226  class        TOrder
-      ...
-  imports (38):
-      Windows
-      Messages
-      ...
-```
+The "of N" denominator tells you the total population size, helping you gauge rarity. This form is hard to replicate with `grep` because grep doesn't know which hits are class-name parents vs unqualified functions vs imports — and summary headers can't be generated from raw grepping.
 
 **Display rule**: methods are shown as `<Class>.<Method>`, top-level
 functions as bare `<Name>`. The full
@@ -294,158 +221,35 @@ command exists.
 
 ```powershell
 # One method, full signature
-uv run winterthur declaration path\to\OrderDM.pas TOrder.AddNormalItem
+uv run winterthur declaration path\to\file ClassName.MethodName
 
 # All overloads of a name (glob)
-uv run winterthur declaration path\to\OrderDM.pas "TOrder.AddNormalItem*"
+uv run winterthur declaration path\to\file "ClassName.MethodName*"
 
-# Family search: every TOrder.Calculate* method
-uv run winterthur declaration path\to\OrderDM.pas "TOrder.Calculate*"
+# Family search: methods sharing a prefix
+uv run winterthur declaration path\to\file "ClassName.Prefix*"
 
 # Use a real regex if glob isn't expressive enough
-uv run winterthur declaration path\to\OrderDM.pas "TOrder\.(Add|Insert)Item.*" --regex
+uv run winterthur declaration path\to\file "ClassName\.(Pattern1|Pattern2).*" --regex
 ```
 
-Sample for `TOrder.AddNormalItem*` (3 overloads shown):
+The `declaration` command shows:
+- Full multi-line function/method signatures with parameters and return types
+- Line number and scope (interface/implementation)
+- **All overloads** matching the pattern, useful for understanding call shapes
+- **Leading comments** above the declaration, pulled in verbatim (supports any comment flavor: //, {}, (*, ///)
 
-```
-path\to\OrderDM.pas:872  (interface)
-----------------------------------------------------------------------
-function AddNormalItem(
-                const ModalParent: TCustomForm;
-                const ItemNumber : integer;
-                const MasterID : TGUID;
-                ...
-                var ItemState:TOrderItemState) : TGUID; overload;
+Pattern matches use `re.fullmatch` semantics (anchored) by default — use `symbols --regex` for substring searches instead.
 
-path\to\OrderDM.pas:884  (interface)
-----------------------------------------------------------------------
-function AddNormalItem(
-                const ModalParent: TCustomForm;
-                const ItemNumber : integer;
-                const Quantity:Integer;
-                ...
-                var ItemState:TOrderItemState) : TGUID; overload;
-```
+The default `--limit` is 10 (handles most overload sets); raise for broad patterns.
 
-Pattern matches use `re.fullmatch` semantics (anchored) by default, since
-the typical use is "show me **this specific** symbol family." For
-substring/contains-style searches use `symbols --regex` instead.
+**Common use cases:**
 
-The default `--limit` is 10 (handles most overload sets); raise it for
-broad globs like `"*.Add*"` that match dozens.
+- **Family search by prefix:** Find all methods starting with `Prefix` to understand a class's behavior
+- **Event handler enumeration:** Use trailing-wildcard patterns to list handler methods (common in UI frameworks)
+- **Cross-class method inventory:** Use both leading and trailing wildcards to find methods across class hierarchy (e.g., `T*.Get*` finds all getter methods on all T-classes)
 
-**Family-search example.** Asking "what does this class do, by
-prefix?" against a real ~7000-line Delphi unit:
-
-```powershell
-uv run winterthur declaration path\to\OrderDM.pas "TOrder.R*" --limit 30
-```
-
-Yields the full signatures of every `TOrder` method whose name starts
-with `R` — refresh, reset, refund, replace, reallocate, reassign,
-reinstate, recall, recalc, remove, etc. Excerpt:
-
-```
-path\to\OrderDM.pas:605  (interface)
-----------------------------------------------------------------------
-procedure RefreshItemsOnce;
-
-path\to\OrderDM.pas:683  (interface)
-----------------------------------------------------------------------
-function ReplaceQuantitySeatCheckAndID(const Fields : string; Qty : integer;
-      SeatNumber, CheckNumber : Integer; var NewID : TGuid) : string;
-
-path\to\OrderDM.pas:715  (interface)
-----------------------------------------------------------------------
-procedure ResetPayments;
-
-path\to\OrderDM.pas:720  (interface)
-----------------------------------------------------------------------
-procedure ResetLocalOrders(const KeepLock: boolean = false);
-
-path\to\OrderDM.pas:977  (interface)
-----------------------------------------------------------------------
-procedure ReAllocateWorkingPackageItems(
-        const OrderItemID: TGUID;
-        const PackageQuantity:Integer;
-        AmountToAllocate: currency;
-        const TaxItemsInPackage: boolean;
-        const TaxIncluded : Currency);
-```
-
-The point: `symbols --regex "TOrder.R"` would list 25 names; this gives
-you the **call shapes**, ready to paste into code or feed to an LLM
-that needs to figure out which overload to use.
-
-**Leading-wildcard pattern: enumerate event handlers.** Delphi forms
-typically have dozens of `OnClick` handlers named `<Button>ButtonClick`.
-A trailing-anchor glob fetches them all in one call:
-
-```powershell
-uv run winterthur declaration path\to\MainMenu.pas "*ButtonClick"
-```
-
-Excerpt from a real form unit:
-
-```
-path\to\MainMenu.pas:863  (implementation)
-----------------------------------------------------------------------
-procedure TIPMainMenu.DrawerManagerButtonClick(Sender: TObject);
-
-path\to\MainMenu.pas:991  (implementation)
-----------------------------------------------------------------------
-procedure TIPMainMenu.AuthorizedCreditCardChargesButtonClick(Sender: TObject);
-
-path\to\MainMenu.pas:1001  (implementation)
-----------------------------------------------------------------------
-procedure TIPMainMenu.MovieReportsButtonClick(Sender: TObject);
-
-... (24 total)
-```
-
-**Cross-class getter inventory.** Both wildcards in one pattern lets
-you slice across the class dimension and the method dimension at the
-same time — find every getter on every T-class:
-
-```powershell
-uv run winterthur declaration path\to\RAPCustom.pas "T*.Get*" --limit 40
-```
-
-Excerpt:
-
-```
-path\to\RAPCustom.pas:20  (interface)
------------------------------------------------------------------------
-class function GetSignature: String; override;
-...
-path\to\RAPCustom.pas:48  (implementation)
------------------------------------------------------------------------
-class function TConverUOM.GetSignature: String;
-
-path\to\RAPCustom.pas:81  (implementation)
------------------------------------------------------------------------
-class function TSetSearch.GetSignature: String;
-
-path\to\RAPCustom.pas:122  (implementation)
------------------------------------------------------------------------
-{ TGetDate }
-class function TGetDate.GetSignature: String;
-```
-
-Notice the output shows BOTH the interface forward declarations
-(`kind=method`, line 20) AND the implementation bodies
-(`kind=function`, line 48 etc.) — useful for confirming a class actually
-implements what its interface promises. The `{ TGetDate }` leading
-comment was pulled in automatically.
-
-**Leading comments are pulled in.** When Pascal source has comments
-immediately above a declaration (any flavour — `//`, `{ … }`,
-`(* … *)`, `///`-doc), they're included verbatim above the signature.
-Comment blocks are detected via tree-sitter `comment` nodes, so
-multi-line block comments are handled correctly. A single blank line
-between the comment block and the declaration is tolerated; a larger
-gap means the comment is treated as belonging to something else.
+**Bonus:** Output shows interface declarations AND implementation bodies separately, useful for confirming a class implements what its interface promises.
 
 ### Subcommand: `consts` (constant declarations)
 
@@ -456,34 +260,20 @@ file with its line, name, and full text.
 
 ```powershell
 # Dump every const in a file
-uv run winterthur consts path\to\foo.consts.commerce.pas
+uv run winterthur consts path\to\file.pas
 
 # Filter by glob
-uv run winterthur consts path\to\foo.consts.commerce.pas "bt_*"
+uv run winterthur consts path\to\file.pas "PREFIX_*"
 
 # Regex if glob isn't enough
-uv run winterthur consts path\to\OrderDM.pas "WaiverMode.*" --regex
+uv run winterthur consts path\to\file.pas "PATTERN.*" --regex
 ```
 
-Sample on a real const-only unit:
+The `consts` command lists every constant declaration with:
+- Line number, name, and full text
+- Match count: `N of M constants` (shows rarity: rare patterns vs common)
 
-```
-# path\to\foo.consts.commerce.pas: 17 of 17 constants
-     10  bt_ItemButton = 0;
-     11  bt_PageButton = 1;
-     12  bt_GoToLastScreen = 2;
-     18  bt_Exit      = 8;
-     24  bt_Static = 14;
-     33  bt_ExperienceTimes = 68;
-     41  st_AlternateA   = 0;
-     ...
-```
-
-The header line tells you `N of M` so you see both match count and
-total population. Default `--limit` is 200 (much higher than other
-subcommands; const files often run hundreds of entries). Pattern
-syntax matches `declaration`: glob default, `--regex` to switch,
-case-insensitive unless `--case-sensitive`.
+Useful for const-only files (const modules, enums, magic-number registries) where `symbols` and `metrics` return empty results. Default `--limit` is 200 (much higher than other subcommands; const files often run hundreds of entries). Pattern syntax: glob default, `--regex` to switch, case-insensitive unless `--case-sensitive`.
 
 ### Subcommand: `metrics` (per-function structural metrics)
 

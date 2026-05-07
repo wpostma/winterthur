@@ -338,6 +338,29 @@ LANGUAGE_CONFIGS: dict[str, LanguageConfig] = {
 
 
 # ---------------------------------------------------------------------------
+# Caught-exception record — silent try/except is never acceptable in this
+# codebase; every fall-through is logged AND recorded on the parser so a
+# caller can introspect what was swallowed and where.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CaughtException:
+    """One exception that ASTParser caught and recovered from.
+
+    Filled by :meth:`ASTParser._record_exception`. Surfaced via
+    ``parser.caught_exceptions`` so callers (CLI, tests, embedding code)
+    can answer "did anything go wrong silently?" without grepping logs.
+    """
+
+    where: str            # human-readable site label, e.g. "_run_query (modern API)"
+    exc_type: str         # exception class name, e.g. "ImportError"
+    message: str          # str(exc)
+    file_path: str | None = None   # source file being parsed when this fired, if known
+    language: str | None = None    # language tag for that file, if known
+
+
+# ---------------------------------------------------------------------------
 # ASTParser
 # ---------------------------------------------------------------------------
 
@@ -354,6 +377,12 @@ class ASTParser:
     1. Write ``packages/core/queries/<lang>.scm``
     2. Add one entry to ``LANGUAGE_CONFIGS``
     That's it.  No Python class, no new module.
+
+    Caught exceptions are tracked: any internal recovery path (tree-sitter
+    API version drift, query compile failure) appends a
+    :class:`CaughtException` to ``self.caught_exceptions`` AND emits a
+    structlog record. Inspect ``parser.caught_exception_count`` to see if
+    anything was swallowed during a session.
     """
 
     def __init__(self, *, skip_implementation: bool = False) -> None:
@@ -372,10 +401,53 @@ class ASTParser:
         self.skip_implementation = skip_implementation
         # Cache: lang → compiled Query object (None if .scm not found)
         self._query_cache: dict[str, object] = {}
+        # Every silently-caught exception is appended here. Read-only from
+        # the outside; mutated only by _record_exception.
+        self.caught_exceptions: list[CaughtException] = []
+        # Per-parse-call context, set by parse_file so deeper helpers can
+        # tag their CaughtException records with file_path/language without
+        # threading those through every helper signature.
+        self._current_file_path: str | None = None
+        self._current_language: str | None = None
+
+    @property
+    def caught_exception_count(self) -> int:
+        """How many exceptions this parser has silently recovered from."""
+        return len(self.caught_exceptions)
+
+    def _record_exception(self, where: str, exc: BaseException) -> None:
+        """Append a CaughtException record AND emit a debug-level log entry.
+
+        The two-channel design is deliberate: callers that don't read logs
+        (tests, downstream tools) can still see the swallowed event via
+        ``parser.caught_exceptions``; live operators tailing logs see it
+        immediately via structlog.
+        """
+        rec = CaughtException(
+            where=where,
+            exc_type=type(exc).__name__,
+            message=str(exc),
+            file_path=self._current_file_path,
+            language=self._current_language,
+        )
+        self.caught_exceptions.append(rec)
+        log.debug(
+            "winterthur caught exception",
+            where=rec.where,
+            exc_type=rec.exc_type,
+            message=rec.message,
+            file_path=rec.file_path,
+            language=rec.language,
+        )
 
     def parse_file(self, file_info: FileInfo, source: bytes) -> ParsedFile:
         """Parse *source* bytes and return a fully populated ParsedFile."""
         lang = file_info.language
+        # Stash per-call context so _record_exception can tag any caught
+        # exception with the file/language it fired against. Cleared on
+        # every entry so we never carry stale context between calls.
+        self._current_file_path = file_info.path
+        self._current_language = lang
         source = _prepare_source_for_parse(
             file_info, source, skip_implementation=self.skip_implementation
         )
@@ -439,6 +511,29 @@ class ASTParser:
     # Query loading
     # ------------------------------------------------------------------
 
+    def _run_query(self, query: object, root_node: Node) -> list[dict[str, list[Node]]]:
+        """Execute a tree-sitter *query* across cross-version API drift.
+
+        Tries the modern (tree-sitter >= 0.23) ``QueryCursor`` API first.
+        If that raises, records the exception and falls back to the legacy
+        ``query.matches()`` tuple API. If THAT also raises, records the
+        second exception and returns whatever was collected (likely empty).
+
+        Both fallback arms call :meth:`_record_exception` — silent recovery
+        is never acceptable in this codebase, even when the recovery is the
+        intended path on older tree-sitter installs.
+        """
+        try:
+            return _run_query_modern(query, root_node)
+        except Exception as exc:  # noqa: BLE001 — recorded, not silenced
+            self._record_exception("_run_query (modern API)", exc)
+
+        try:
+            return _run_query_legacy(query, root_node)
+        except Exception as exc:  # noqa: BLE001 — recorded, not silenced
+            self._record_exception("_run_query (legacy API)", exc)
+            return []
+
     def _get_query(self, lang: str, language: Language) -> object | None:
         """Load and cache the compiled tree-sitter Query for *lang*."""
         if lang in self._query_cache:
@@ -461,8 +556,13 @@ class ASTParser:
             self._query_cache[lang] = compiled
             log.debug("Compiled query", language=lang)
             return compiled
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — recorded, not silenced
+            # Also keep the explicit warning: a failed query compile is
+            # actionable for the maintainer (broken .scm file), so we want
+            # it visible at default log level. Recording on the parser is
+            # the structured channel for callers/tests.
             log.warning("Failed to compile query", language=lang, error=str(exc))
+            self._record_exception(f"_get_query[{lang}]", exc)
             self._query_cache[lang] = None
             return None
 
@@ -484,7 +584,7 @@ class ASTParser:
         symbols: list[Symbol] = []
         seen: set[tuple[int, str]] = set()  # (start_line, name) — dedup decorated dupes
 
-        for capture_dict in _run_query(query, tree.root_node):  # type: ignore[attr-defined]
+        for capture_dict in self._run_query(query, tree.root_node):
             def_nodes = capture_dict.get("symbol.def", [])
             name_nodes = capture_dict.get("symbol.name", [])
             params_nodes = capture_dict.get("symbol.params", [])
@@ -617,7 +717,7 @@ class ASTParser:
         imports: list[Import] = []
         seen_imports: set[tuple[str, str]] = set()
 
-        for capture_dict in _run_query(query, tree.root_node):  # type: ignore[attr-defined]
+        for capture_dict in self._run_query(query, tree.root_node):
             stmt_nodes = capture_dict.get("import.statement", [])
             module_nodes = capture_dict.get("import.module", [])
 
@@ -693,33 +793,37 @@ def parse_file(file_info: FileInfo, source: bytes) -> ParsedFile:
 # ---------------------------------------------------------------------------
 
 
-def _run_query(query: object, root_node: Node) -> list[dict[str, list[Node]]]:
-    """Execute a tree-sitter query and return a list of capture dicts.
+def _run_query_modern(query: object, root_node: Node) -> list[dict[str, list[Node]]]:
+    """Run *query* using the tree-sitter >= 0.23 QueryCursor API.
 
-    Handles both the legacy tuple API and the newer QueryMatch API across
-    tree-sitter versions >= 0.22.
+    Raises any error from the underlying API. The caller is responsible
+    for falling back / recording. Kept as a free function so the modern
+    and legacy variants are independently unit-testable.
+    """
+    from tree_sitter import QueryCursor  # type: ignore[attr-defined]
+
+    results: list[dict[str, list[Node]]] = []
+    cursor = QueryCursor(query)  # type: ignore[call-arg]
+    for match in cursor.matches(root_node):
+        if hasattr(match, "captures"):
+            # tree-sitter >= 0.23: QueryMatch object
+            results.append(match.captures)
+        elif isinstance(match, tuple) and len(match) == 2:
+            _, caps = match
+            results.append(caps)
+    return results
+
+
+def _run_query_legacy(query: object, root_node: Node) -> list[dict[str, list[Node]]]:
+    """Run *query* using the pre-0.23 query.matches() tuple API.
+
+    Raises any error from the underlying API.
     """
     results: list[dict[str, list[Node]]] = []
-    try:
-        from tree_sitter import QueryCursor  # type: ignore[attr-defined]
-
-        cursor = QueryCursor(query)  # type: ignore[call-arg]
-        for match in cursor.matches(root_node):
-            if hasattr(match, "captures"):
-                # tree-sitter >= 0.23: QueryMatch object
-                results.append(match.captures)
-            elif isinstance(match, tuple) and len(match) == 2:
-                _, caps = match
-                results.append(caps)
-    except Exception:
-        # Fallback: query.matches() returning list of (index, dict) tuples
-        try:
-            for item in query.matches(root_node):  # type: ignore[attr-defined]
-                if isinstance(item, tuple) and len(item) == 2:
-                    _, caps = item
-                    results.append(caps)
-        except Exception as exc:
-            log.warning("query.matches() failed", error=str(exc))
+    for item in query.matches(root_node):  # type: ignore[attr-defined]
+        if isinstance(item, tuple) and len(item) == 2:
+            _, caps = item
+            results.append(caps)
     return results
 
 

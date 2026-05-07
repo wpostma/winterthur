@@ -168,7 +168,16 @@ def _combined_errors(
         return list(parser_errors)
     try:
         from tree_sitter import Parser as _Parser
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — install-integrity guard, logged
+        # tree_sitter import failing here means the winterthur install is
+        # broken (parser.py imports it unconditionally). Log loudly; keep
+        # the parser-side errors so the caller still sees what was found.
+        import structlog
+        structlog.get_logger(__name__).warning(
+            "tree_sitter import failed in symbols command",
+            error=str(exc),
+            language=language,
+        )
         return list(parser_errors)
 
     ts_parser = _Parser(ts_language)

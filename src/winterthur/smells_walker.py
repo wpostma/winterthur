@@ -17,10 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from .metrics_walker import (
-    _iter_descendants,
-    NODE_KINDS_BY_LANGUAGE,
-)
+from .walkers import get_walker
+from .walkers.base import _iter_descendants
 
 
 @dataclass
@@ -64,11 +62,11 @@ def find_pascal_smells(
     if language != "pascal":
         return []
 
-    kinds = NODE_KINDS_BY_LANGUAGE.get(language)
-    if kinds is None:
+    walker = get_walker(language)
+    if walker is None:
         return []
 
-    fn_kinds = kinds["function_def"]
+    fn_kinds = walker.function_node_types
     function_ranges: list[tuple[int, int, object]] = []
     for fn_node in _iter_descendants(root_node):
         if fn_node.type in fn_kinds:
