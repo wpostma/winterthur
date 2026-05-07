@@ -390,6 +390,41 @@ procedure TIPMainMenu.MovieReportsButtonClick(Sender: TObject);
 ... (24 total)
 ```
 
+**Cross-class getter inventory.** Both wildcards in one pattern lets
+you slice across the class dimension and the method dimension at the
+same time — find every getter on every T-class:
+
+```powershell
+uv run pascalparser declaration path\to\RAPCustom.pas "T*.Get*" --limit 40
+```
+
+Excerpt:
+
+```
+path\to\RAPCustom.pas:20  (method)
+-----------------------------------------------------------------------
+class function GetSignature: String; override;
+...
+path\to\RAPCustom.pas:48  (function)
+-----------------------------------------------------------------------
+class function TConverUOM.GetSignature: String;
+
+path\to\RAPCustom.pas:81  (function)
+-----------------------------------------------------------------------
+class function TSetSearch.GetSignature: String;
+
+path\to\RAPCustom.pas:122  (function)
+-----------------------------------------------------------------------
+{ TGetDate }
+class function TGetDate.GetSignature: String;
+```
+
+Notice the output shows BOTH the interface forward declarations
+(`kind=method`, line 20) AND the implementation bodies
+(`kind=function`, line 48 etc.) — useful for confirming a class actually
+implements what its interface promises. The `{ TGetDate }` leading
+comment was pulled in automatically.
+
 **Leading comments are pulled in.** When Pascal source has comments
 immediately above a declaration (any flavour — `//`, `{ … }`,
 `(* … *)`, `///`-doc), they're included verbatim above the signature.
