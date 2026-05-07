@@ -39,11 +39,22 @@ _FUNCTION_KINDS = frozenset(
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
+    # See declaration.register() for the alias-hiding rationale.
     sub = subparsers.add_parser(
         "metrics",
-        aliases=["metric"],
         help="Per-function structural metrics (JSON for the codereview skill)",
     )
+    _add_args(sub)
+    sub.set_defaults(func=run)
+
+    alias = subparsers.add_parser("metric")
+    _add_args(alias)
+    alias.set_defaults(func=run)
+    from .declaration import _hide_from_help
+    _hide_from_help(subparsers, "metric")
+
+
+def _add_args(sub: argparse.ArgumentParser) -> None:
     sub.add_argument(
         "files",
         nargs="+",
@@ -97,7 +108,6 @@ def register(subparsers: argparse._SubParsersAction) -> None:
             "before parsing (fast-symbol-graph mode; default off)."
         ),
     )
-    sub.set_defaults(func=run)
 
 
 def run(args: argparse.Namespace) -> int:

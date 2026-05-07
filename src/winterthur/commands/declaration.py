@@ -35,11 +35,42 @@ from .parse import _PARSE_ERROR_DISCLAIMER, _BODY_CHILD_TYPES
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
+    # Register the visible "declaration" plus a silent "declarations"
+    # alias. argparse's built-in aliases= would render "declaration
+    # (declarations)" in --help, which we don't want — the alias should
+    # exist but not advertise itself. Workaround: register the alias
+    # as a separate subparser, then strip its entry from the parser's
+    # _choices_actions so it disappears from --help while remaining
+    # dispatchable.
     sub = subparsers.add_parser(
         "declaration",
-        aliases=["declarations"],
         help="Dump the full declaration (signature + params) of matching symbols",
     )
+    _add_args(sub)
+    sub.set_defaults(func=run)
+
+    alias = subparsers.add_parser("declarations")
+    _add_args(alias)
+    alias.set_defaults(func=run)
+    _hide_from_help(subparsers, "declarations")
+
+
+def _hide_from_help(subparsers: argparse._SubParsersAction, name: str) -> None:
+    """Strip *name* from a subparsers action's help listing.
+
+    Used to register a silent alias: the subparser still dispatches but
+    won't appear in --help. Touches a private argparse attribute, so
+    guarded with hasattr to degrade rather than crash if argparse changes.
+    """
+    actions = getattr(subparsers, "_choices_actions", None)
+    if actions is None:
+        return
+    for a in list(actions):
+        if getattr(a, "dest", None) == name:
+            actions.remove(a)
+
+
+def _add_args(sub: argparse.ArgumentParser) -> None:
     sub.add_argument("file", help="Source file")
     sub.add_argument(
         "symbol",
@@ -79,7 +110,6 @@ def register(subparsers: argparse._SubParsersAction) -> None:
             "method; raise this if you intentionally want broad matches."
         ),
     )
-    sub.set_defaults(func=run)
 
 
 def run(args: argparse.Namespace) -> int:

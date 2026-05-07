@@ -205,6 +205,42 @@ def _iter_descendants(node) -> Iterable:
 _PASCAL_CONTROL_FLOW_CALLS = frozenset({"exit", "break", "continue"})
 
 
+def _pascal_control_flow_name(node) -> str | None:
+    """Return ``'exit'`` / ``'break'`` / ``'continue'`` if *node* is one.
+
+    Pascal's tree-sitter grammar treats Exit/Break/Continue as ordinary
+    identifiers, so we have to recognise them in two shapes:
+
+    1. ``Exit;`` — the grammar emits ``statement → identifier ;``. The bare
+       identifier IS the call. This is the common case.
+    2. ``Exit(Result);`` — emits ``statement → exprCall(Exit, exprArgs(...))``.
+       Here the call is wrapped in an exprCall node.
+
+    Detection at the ``statement`` level catches both: peek at the first
+    non-trivia child, normalise to the head identifier text, and match
+    case-insensitively against the three control-flow names.
+
+    Returns ``None`` if *node* isn't a control-flow statement.
+    """
+    if node.type != "statement" or not node.children:
+        return None
+    head = node.children[0]
+    if head.type == "identifier":
+        if not head.text:
+            return None
+        name = head.text.decode("utf-8", errors="replace").lower()
+    elif head.type == "exprCall":
+        name = _first_identifier_name(head)
+        if name is None:
+            return None
+        name = name.lower()
+    else:
+        return None
+    if name in _PASCAL_CONTROL_FLOW_CALLS:
+        return name
+    return None
+
+
 def _walk(
     node, kinds: dict[str, frozenset[str]], m: FunctionMetrics,
     depth: int, anon_depth: int, language: str,
@@ -212,17 +248,17 @@ def _walk(
     """Recursive counting walk. ``m`` is mutated in place."""
     t = node.type
 
-    # Pascal-only: detect Exit/Break/Continue as exprCall, not as keyword tokens.
-    if language == "pascal" and t == "exprCall":
-        first_id = _first_identifier_name(node)
-        if first_id is not None:
-            low = first_id.lower()
-            if low == "exit":
-                m.exit_count = _bump(m.exit_count)
-            elif low == "break":
-                m.break_count = _bump(m.break_count)
-            elif low == "continue":
-                m.continue_count = _bump(m.continue_count)
+    # Pascal-only: Exit/Break/Continue can appear as `statement → identifier`
+    # (bare, common case) or as `statement → exprCall` (with a return value).
+    # _pascal_control_flow_name handles both.
+    if language == "pascal" and t == "statement":
+        cf = _pascal_control_flow_name(node)
+        if cf == "exit":
+            m.exit_count = _bump(m.exit_count)
+        elif cf == "break":
+            m.break_count = _bump(m.break_count)
+        elif cf == "continue":
+            m.continue_count = _bump(m.continue_count)
 
     if t in kinds["if"]:
         m.if_count = _bump(m.if_count)
@@ -293,8 +329,14 @@ def _first_identifier_name(node) -> str | None:
 
 
 def _populate_function_signature(fn_node, source: bytes, m: FunctionMetrics) -> None:
-    """Count formal parameters and capture their names."""
-    # Find the declProc child (Pascal: contains the signature).
+    """Count formal parameters and capture their names.
+
+    Pascal packs comma-separated parameters of the same type into a single
+    ``declArg`` node — ``(A, B, C: Integer; D: string)`` produces TWO declArg
+    nodes (one for the integers, one for the string), but the integers'
+    declArg holds 3 identifier children before its ``:``. We count
+    identifiers up to the first ``:`` so each comma-separated name counts.
+    """
     decl = next(
         (c for c in fn_node.children if c.type == "declProc"),
         None,
@@ -302,15 +344,17 @@ def _populate_function_signature(fn_node, source: bytes, m: FunctionMetrics) -> 
     if decl is None:
         return
     for n in _iter_descendants(decl):
-        if n.type == "declArg":
+        if n.type != "declArg":
+            continue
+        for c in n.children:
+            if c.type == ":":
+                break  # everything after `:` is the type, not a param name
+            if c.type != "identifier":
+                continue
             m.param_count = _bump(m.param_count)
-            # First identifier child = parameter name
-            for c in n.children:
-                if c.type == "identifier":
-                    m.params.append(
-                        source[c.start_byte:c.end_byte].decode("utf-8", errors="replace")
-                    )
-                    break
+            m.params.append(
+                source[c.start_byte:c.end_byte].decode("utf-8", errors="replace")
+            )
 
 
 def _count_result_assignments(

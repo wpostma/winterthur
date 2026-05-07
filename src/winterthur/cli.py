@@ -29,9 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="winterthur",
         description=(
-            "Pascal/Delphi parser plus lint and metrics tooling. "
-            "Single-unit-of-compilation scanning via tree-sitter — "
-            "no .dproj, no compile, no .dcu resolution."
+            "Multi-Language Parser Tool for "
+            "Delphi, Python, C, C++, Rust, JavaScript, TypeScript"
         ),
     )
     parser.add_argument(
@@ -52,7 +51,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+
+    # Zero-arg invocation: print version, then the same help argparse would
+    # show for `--help`, and exit 0. Friendlier than argparse's default
+    # "error: a subcommand is required" — typing `winterthur` to confirm
+    # the install gives both the version and the command catalogue.
+    effective = sys.argv[1:] if argv is None else list(argv)
+    if not effective:
+        print(f"winterthur {__version__}")
+        print()
+        parser.print_help()
+        return 0
+
+    args = parser.parse_args(effective)
     return args.func(args)
 
 

@@ -64,8 +64,13 @@ uv sync                              # or: pip install -e ".[dev]"
 # Test
 pytest
 
-# CLI
-winterthur FrontPOS/Source/AccessTicketUtil.pas > metrics.json
+# Install (use --reinstall every time — uv tool installs are frozen
+# copies, so on a second install without --reinstall you'd silently
+# keep running the old build)
+uv tool install . --reinstall
+
+# Run it with a command and a filename
+winterthur metrics path/to/file.py  
 ```
 
 ## Provenance
