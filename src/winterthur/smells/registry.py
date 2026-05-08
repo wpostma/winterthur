@@ -9,11 +9,13 @@ from __future__ import annotations
 from .base import SmellFinder
 from .pascal import PascalSmellFinder
 from .python import PythonSmellFinder
+from .typescript import TypeScriptSmellFinder
 
 
 _FINDERS: dict[str, SmellFinder] = {
     "pascal": PascalSmellFinder(),
     "python": PythonSmellFinder(),
+    "typescript": TypeScriptSmellFinder(),
 }
 
 

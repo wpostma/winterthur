@@ -77,6 +77,13 @@ RULE_NAMES = {
     "E2": "silent-except",          # except X: pass — swallowed
     "M1": "mutable-default-arg",    # def f(x=[]) shared-list footgun
     "D1": "missing-docstring",      # public non-trivial function lacks doc
+    # TypeScript-specific AST patterns:
+    "N1": "non-null-assertion",     # x! bypasses the type system
+    "Y1": "any-type",               # explicit `any` annotation
+    "Q1": "loose-equality",         # == / != coercion (vs ===/!==)
+    "TS1": "ts-suppression",        # @ts-ignore / @ts-nocheck comments
+    "EC1": "empty-catch",           # catch { } silently swallows
+    "AS1": "angle-bracket-cast",    # <Foo>x; prefer `x as Foo`
 }
 
 # Severity ordering for sorted output (red first).
@@ -316,6 +323,17 @@ def _ast_findings(
         "M1": SEVERITY_RED,
         # D1 is advisory: missing docstring on a non-trivial public API.
         "D1": SEVERITY_YELLOW,
+        # N1/Y1: type-system bypasses are the most-cited TS smells; both yellow.
+        "N1": SEVERITY_YELLOW,
+        "Y1": SEVERITY_YELLOW,
+        # Q1 loose equality is a real coercion-bug source; red.
+        "Q1": SEVERITY_RED,
+        # TS1 disables checking; yellow (sometimes unavoidable for vendor types).
+        "TS1": SEVERITY_YELLOW,
+        # EC1 silent-swallow parallels Python's E2; yellow.
+        "EC1": SEVERITY_YELLOW,
+        # AS1 angle-bracket cast is stylistic-but-broken-in-JSX; yellow.
+        "AS1": SEVERITY_YELLOW,
     }
 
     for h in hits:
