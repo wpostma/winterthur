@@ -71,10 +71,19 @@ RULE_NAMES = {
     "L3": "deep-nesting",
     "P1": "many-params",
     "A4": "multiple-exits",
-    "W1": "with-statement",         # Pascal-only smell
+    "W1": "with-statement",         # Pascal: scope shadowing
     # Python-specific AST patterns:
     "E1": "bare-except",            # except: catches BaseException
     "E2": "silent-except",          # except X: pass — swallowed
+    # Pascal-specific AST patterns (Phase 2). E3 instead of E1 to avoid
+    # the global-namespace collision with Python's bare-except above.
+    "E3": "empty-except",           # Pascal: try/except with no body
+    "G1": "goto-statement",         # Pascal: any goto
+    "R1": "redundant-bool-compare", # Pascal: if X = True / X <> False
+    "U1": "uses-bloat",             # Pascal: unit imports >= 30
+    "UV1": "untyped-var-parameter", # Pascal: var X without type
+    "PP1": "pointer-typed-parameter", # Pascal: P/Pointer/^T param
+    "C1": "allocator-not-named-Create", # Pascal: Result := X.Create but name lacks Create/Make/New
     "M1": "mutable-default-arg",    # def f(x=[]) shared-list footgun
     "D1": "missing-docstring",      # public non-trivial function lacks doc
     # TypeScript-specific AST patterns:
@@ -314,6 +323,21 @@ def _ast_findings(
     # etc.) needs the same shape.
     severity_for_rule = {
         "W1": SEVERITY_YELLOW,
+        # Pascal Phase 2:
+        # E3 silent-swallow parallels Python E2 / TS EC1 — yellow.
+        "E3": SEVERITY_YELLOW,
+        # G1 goto is universal anti-pattern; red.
+        "G1": SEVERITY_RED,
+        # R1 redundant-bool is style noise; yellow.
+        "R1": SEVERITY_YELLOW,
+        # U1 uses-bloat is a god-unit signal; yellow.
+        "U1": SEVERITY_YELLOW,
+        # UV1 untyped-var disables type system; yellow.
+        "UV1": SEVERITY_YELLOW,
+        # PP1 pointer-typed-param is a Win32-API edge / type bypass; yellow.
+        "PP1": SEVERITY_YELLOW,
+        # C1 unnamed-allocator is an ownership-leak trap; red.
+        "C1": SEVERITY_RED,
         # E1 catches SystemExit/KeyboardInterrupt — almost always a bug.
         "E1": SEVERITY_RED,
         # E2 (silent pass) is sometimes deliberate (best-effort cleanup);

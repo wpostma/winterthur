@@ -366,19 +366,23 @@ class TestDestructorPattern:
     """Bare ``except`` in a destructor — gexperts uses this idiom in
     several places (GX_BaseExpert.Destroy is the canonical example).
 
-    No rule flags it yet; the fixture's job is to be a stable input for
-    the eventual ``E1: empty-except`` / ``E2: bare-except`` rule. For
-    now we just assert the file parses cleanly so nobody silently
-    regresses parsing of the suppression comment.
+    The Pascal Phase 2 ``E3 — empty-except`` rule now fires on this
+    pattern, including when the only thing inside the except block is
+    a comment like ``// ignore exceptions in the destructor``. A
+    deliberate comment does NOT take an empty handler off the smell
+    list — the goal is to surface every silent swallow.
     """
 
     def test_destructor_parses_cleanly(self) -> None:
         rec = _scan(_GEXPERTS_DESTRUCTOR)
         assert "errors" not in rec, rec.get("errors")
 
-    def test_destructor_has_no_current_findings(self) -> None:
-        # The destructor is short and has no with/exits/many-params/etc.
-        # When E1/E2 land this assertion will need updating; the test
-        # name will surface in the diff.
+    def test_destructor_fires_E3_empty_except(self) -> None:
+        # Once the Pascal Phase 2 detectors landed, this destructor's
+        # ``except // ignore … end`` started reporting E3 — exactly
+        # what gexperts authors had to suppress with their inline
+        # ``// FI:W501 Empty EXCEPT block`` directive.
         rec = _scan(_GEXPERTS_DESTRUCTOR)
-        assert rec["findings"] == []
+        e3 = _findings_for(rec, "E3")
+        assert len(e3) == 1
+        assert e3[0]["severity"] == "yellow"
